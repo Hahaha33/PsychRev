@@ -44,6 +44,16 @@
   .page { display: none; padding: 16px; }
   .page.active { display: block; }
 
+  /* ── TODAY BANNER ── */
+  .today-banner { background: linear-gradient(135deg,#185FA5 0%,#1976D2 100%); color:#fff; border-radius:14px; padding:14px 16px; margin-bottom:14px; display:flex; align-items:center; gap:12px; }
+  .today-banner.no-day { background: linear-gradient(135deg,#555 0%,#777 100%); }
+  .today-banner-icon { font-size:28px; flex-shrink:0; }
+  .today-banner-body { flex:1; min-width:0; }
+  .today-banner-date { font-size:12px; opacity:.85; font-weight:500; letter-spacing:.03em; margin-bottom:2px; }
+  .today-banner-day { font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .today-banner-topic { font-size:12px; opacity:.85; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .today-banner-badge { background:rgba(255,255,255,.22); border-radius:20px; padding:4px 10px; font-size:12px; font-weight:700; flex-shrink:0; }
+
   /* ── PLAN ── */
   .exam-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
   .exam-card { border-radius: 12px; padding: 12px; text-align: center; }
@@ -69,6 +79,7 @@
   .day-row.p1 { border-left: 3px solid var(--p1); }
   .day-row.p2 { border-left: 3px solid var(--p2); }
   .day-row.p3 { border-left: 3px solid var(--p3); }
+  .day-row.today-row { box-shadow: 0 0 0 2px #185FA5; }
   .day-row.exam-day { border: 2px solid #E24B4A; background: #fff5f5; }
   .day-num { font-size: 11px; color: var(--text2); min-width: 36px; }
   .day-info { flex: 1; }
@@ -266,6 +277,7 @@
 
 <!-- ═══════════ SCHEDULE PAGE ═══════════ -->
 <div class="page active" id="page-plan">
+  <div id="today-banner"></div>
   <div class="exam-cards">
     <div class="exam-card p1"><div class="label">Paper 1</div><div class="date">15 May</div><div class="countdown" id="cd1"></div></div>
     <div class="exam-card p2"><div class="label">Paper 2</div><div class="date">20 May</div><div class="countdown" id="cd2"></div></div>
@@ -453,7 +465,7 @@
 // ══════════════════════════════════════════════════════
 // APP DATA
 // ══════════════════════════════════════════════════════
-const TODAY = new Date(2026,3,26);
+const TODAY = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
 
 const PLAN = [
   {day:1,paper:'p1',topic:'Social influence',focus:'Conformity types & explanations — Asch, NSI vs ISI',date:new Date(2026,3,26)},
@@ -734,11 +746,43 @@ let idx=0,revealed=false,scoreGood=0,scoreHard=0,mode='all';
 
 // ── INIT ──
 async function init(){
+  buildTodayBanner();
   buildCountdowns();
   buildDayList();
   await loadState();
   buildTopicList();
   loadCards();
+}
+
+function buildTodayBanner(){
+  const el=document.getElementById('today-banner');
+  const todayEntry=PLAN.find(d=>d.date.toDateString()===TODAY.toDateString());
+  const dateLabel=TODAY.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  if(todayEntry){
+    const paperLabel=todayEntry.paper==='p1'?'Paper 1':todayEntry.paper==='p2'?'Paper 2':'Paper 3';
+    el.className='today-banner';
+    el.innerHTML=`
+      <div class="today-banner-icon">📅</div>
+      <div class="today-banner-body">
+        <div class="today-banner-date">${dateLabel}</div>
+        <div class="today-banner-day">Day ${todayEntry.day} of 30 — ${todayEntry.topic}</div>
+        <div class="today-banner-topic">${todayEntry.focus}</div>
+      </div>
+      <div class="today-banner-badge">${paperLabel}</div>`;
+  } else {
+    const planStart=PLAN[0].date;
+    const planEnd=PLAN[PLAN.length-1].date;
+    let msg='';
+    if(TODAY<planStart) msg='Plan starts '+planStart.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    else msg='30-day plan complete 🎉';
+    el.className='today-banner no-day';
+    el.innerHTML=`
+      <div class="today-banner-icon">📅</div>
+      <div class="today-banner-body">
+        <div class="today-banner-date">${dateLabel}</div>
+        <div class="today-banner-day">${msg}</div>
+      </div>`;
+  }
 }
 
 function daysUntil(d){
@@ -755,14 +799,17 @@ function buildCountdowns(){
 
 function buildDayList(){
   const dl=document.getElementById('day-list');
+  let todayEl=null;
   PLAN.forEach(d=>{
     const isToday=d.date.toDateString()===TODAY.toDateString();
     const div=document.createElement('div');
-    div.className='day-row '+(d.exam?'exam-day':d.paper);
+    div.className='day-row '+(d.exam?'exam-day':d.paper)+(isToday?' today-row':'');
     const dateStr=d.date.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
     div.innerHTML=`<div class="day-num">Day ${d.day}</div><div class="day-info"><div class="day-topic">${isToday?'⭐ ':''}${d.topic}</div><div class="day-focus">${d.focus}</div></div><div class="day-date">${dateStr}</div>`;
     dl.appendChild(div);
+    if(isToday) todayEl=div;
   });
+  if(todayEl) setTimeout(()=>todayEl.scrollIntoView({block:'nearest',behavior:'smooth'}),200);
 }
 
 function buildTopicList(){
