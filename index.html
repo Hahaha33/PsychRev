@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#185FA5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AQA Psych">
+<meta name="description" content="AQA A-Level Psychology revision: flashcards, topic tracker, study schedule.">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>AQA Psychology Revision</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --p1: #185FA5; --p1-bg: #E6F1FB; --p1-border: #B5D4F4;
+    --p2: #0F6E56; --p2-bg: #E1F5EE; --p2-border: #9FE1CB;
+    --p3: #534AB7; --p3-bg: #EEEDFE; --p3-border: #CECBF6;
+    --pos: #3B6D11; --pos-bg: #EAF3DE; --pos-border: #97C459;
+    --neg: #A32D2D; --neg-bg: #FCEBEB; --neg-border: #F09595;
+    --text: #1a1a1a; --text2: #666; --border: #e0e0e0;
+    --bg: #ffffff; --bg2: #f8f8f7; --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text: #f0f0f0; --text2: #aaa; --border: #333; --bg: #1a1a1a; --bg2: #252525;
+      --p1-bg:#1a2d45; --p2-bg:#1a2e28; --p3-bg:#26234a;
+      --pos-bg:#1e2e14; --neg-bg:#2e1414;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── NAV ── */
+  .nav { position: sticky; top: 0; z-index: 100; background: var(--bg); border-bottom: 1px solid var(--border); padding: 12px 16px 0; }
+  .nav-title { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+  .nav-tabs { display: flex; gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { flex-shrink: 0; padding: 8px 16px; font-size: 14px; color: var(--text2); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--text); font-weight: 500; }
+
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* ── PLAN ── */
+  .exam-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+  .exam-card { border-radius: 12px; padding: 12px; text-align: center; }
+  .exam-card.p1 { background: var(--p1-bg); }
+  .exam-card.p2 { background: var(--p2-bg); }
+  .exam-card.p3 { background: var(--p3-bg); }
+  .exam-card .label { font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .exam-card.p1 .label { color: var(--p1); }
+  .exam-card.p2 .label { color: var(--p2); }
+  .exam-card.p3 .label { color: var(--p3); }
+  .exam-card .date { font-size: 15px; font-weight: 700; }
+  .exam-card.p1 .date { color: var(--p1); }
+  .exam-card.p2 .date { color: var(--p2); }
+  .exam-card.p3 .date { color: var(--p3); }
+  .exam-card .countdown { font-size: 11px; margin-top: 2px; }
+  .exam-card.p1 .countdown { color: var(--p1); }
+  .exam-card.p2 .countdown { color: var(--p2); }
+  .exam-card.p3 .countdown { color: var(--p3); }
+
+  .section-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text2); margin-bottom: 8px; }
+  .day-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+  .day-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); }
+  .day-row.p1 { border-left: 3px solid var(--p1); }
+  .day-row.p2 { border-left: 3px solid var(--p2); }
+  .day-row.p3 { border-left: 3px solid var(--p3); }
+  .day-row.exam-day { border: 2px solid #E24B4A; background: #fff5f5; }
+  .day-num { font-size: 11px; color: var(--text2); min-width: 36px; }
+  .day-info { flex: 1; }
+  .day-topic { font-size: 13px; font-weight: 500; }
+  .day-focus { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.4; }
+  .day-date { font-size: 11px; color: var(--text2); text-align: right; min-width: 50px; }
+
+  /* ── TOPICS ── */
+  .topic-group { margin-bottom: 20px; }
+  .group-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text2); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .topic-row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 6px; background: var(--bg); }
+  .topic-row.mastered { border-color: var(--pos-border); background: var(--pos-bg); }
+  .topic-row.review { border-color: #FAC775; background: #FAEEDA; }
+  .check-btn { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; cursor: pointer; transition: all .15s; }
+  .check-btn.mastered { background: var(--pos); border-color: var(--pos); color: white; }
+  .check-btn.review { background: #EF9F27; border-color: #EF9F27; color: white; }
+  .topic-name { flex: 1; font-size: 14px; }
+  .paper-badge { font-size: 11px; padding: 3px 8px; border-radius: 20px; }
+  .paper-badge.p1 { background: var(--p1-bg); color: var(--p1); }
+  .paper-badge.p2 { background: var(--p2-bg); color: var(--p2); }
+  .paper-badge.p3 { background: var(--p3-bg); color: var(--p3); }
+  .cycle-hint { font-size: 12px; color: var(--text2); margin-bottom: 12px; }
+
+  /* ── FLASHCARDS ── */
+  .fc-controls { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+  .fc-select { flex: 1; min-width: 0; font-size: 14px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }
+  .mode-group { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+  .mode-btn { padding: 7px 12px; font-size: 12px; border: none; background: var(--bg); color: var(--text2); cursor: pointer; }
+  .mode-btn.active { background: var(--text); color: var(--bg); }
+  .fc-status { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .fc-counter { font-size: 13px; color: var(--text2); }
+  .score-row { display: flex; gap: 12px; }
+  .score-item { font-size: 12px; color: var(--text2); }
+  .score-item span { font-weight: 600; color: var(--text); }
+  .prog-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 14px; overflow: hidden; }
+  .prog-fill { height: 100%; background: #639922; border-radius: 2px; transition: width .3s; }
+
+  .card-wrap { perspective: 1000px; margin-bottom: 14px; }
+  .flashcard { border: 1.5px solid var(--border); border-radius: var(--radius); padding: 18px; min-height: 200px; cursor: pointer; background: var(--bg); transition: box-shadow .2s; position: relative; }
+  .flashcard:active { box-shadow: 0 0 0 3px rgba(0,0,0,0.1); }
+  .fc-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .fc-tag { font-size: 11px; background: var(--bg2); padding: 3px 8px; border-radius: 20px; color: var(--text2); }
+  .fc-hint-label { font-size: 11px; color: var(--text2); margin-left: auto; }
+  .fc-q { font-size: 15px; font-weight: 600; line-height: 1.5; color: var(--text); }
+  .answer-section { display: none; margin-top: 14px; }
+  .flashcard.revealed .answer-section { display: block; }
+  .flashcard.revealed .fc-hint-label { display: none; }
+  .fc-a { font-size: 13.5px; color: var(--text2); line-height: 1.65; padding-top: 12px; border-top: 1px solid var(--border); margin-bottom: 12px; }
+  .eval-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .eval-box { border-radius: 10px; padding: 10px 11px; }
+  .eval-box.pos { background: var(--pos-bg); border: 1px solid var(--pos-border); }
+  .eval-box.neg { background: var(--neg-bg); border: 1px solid var(--neg-border); }
+  .eval-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
+  .eval-box.pos .eval-lbl { color: var(--pos); }
+  .eval-box.neg .eval-lbl { color: var(--neg); }
+  .eval-txt { font-size: 12px; line-height: 1.55; }
+  .eval-box.pos .eval-txt { color: #2E5A0E; }
+  .eval-box.neg .eval-txt { color: #7A1F1F; }
+  .reveal-hint { text-align: center; font-size: 13px; color: var(--text2); padding: 8px; }
+  .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .act-btn { padding: 14px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--bg); font-size: 14px; font-weight: 500; cursor: pointer; color: var(--text); transition: all .15s; }
+  .act-btn:active { transform: scale(0.97); }
+  .act-btn.good { border-color: var(--pos-border); color: var(--pos); background: var(--pos-bg); }
+  .act-btn.hard { border-color: var(--neg-border); color: var(--neg); background: var(--neg-bg); }
+
+  /* ── PROGRESS ── */
+  .prog-section { margin-bottom: 20px; }
+  .prog-row { margin-bottom: 14px; }
+  .prog-row-header { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+  .prog-row-header .plabel { font-weight: 500; }
+  .prog-row-header .pcount { color: var(--text2); }
+  .prog-bar2 { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .prog-fill2 { height: 100%; border-radius: 4px; transition: width .4s; }
+  .prog-fill2.p1 { background: #378ADD; }
+  .prog-fill2.p2 { background: #1D9E75; }
+  .prog-fill2.p3 { background: #7F77DD; }
+  .prog-sub { font-size: 11px; color: var(--text2); margin-top: 3px; }
+  .overall-stat { background: var(--bg2); border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 20px; }
+  .overall-num { font-size: 36px; font-weight: 700; color: #639922; }
+  .overall-label { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  /* ── SAVE TOAST ── */
+  .save-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #1a1a1a; color: #fff; font-size: 13px; padding: 8px 18px; border-radius: 20px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 999; white-space: nowrap; }
+  .save-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (prefers-color-scheme: dark) { .save-toast { background: #e0e0e0; color: #1a1a1a; } }
+  .reset-btn { width: 100%; margin-top: 12px; padding: 13px; border-radius: 12px; border: 1.5px solid var(--neg-border); background: var(--neg-bg); color: var(--neg); font-size: 14px; font-weight: 500; cursor: pointer; }
+  .last-saved-txt { font-size: 12px; color: var(--text2); text-align: center; margin-top: 10px; }
+
+  /* ── SYNC UI ── */
+  .sync-bar { background: var(--bg2); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+  .sync-bar-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing:.05em; color: var(--text2); margin-bottom: 8px; }
+  .sync-code-row { display: flex; align-items: center; gap: 8px; }
+  .sync-code { flex: 1; font-family: monospace; font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sync-action-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .sync-status-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .sync-dot.synced { background: #639922; }
+  .sync-dot.syncing { background: #EF9F27; animation: pulse 1s infinite; }
+  .sync-dot.offline { background: #aaa; }
+  .sync-dot.error { background: #E24B4A; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .sync-status-txt { font-size: 12px; color: var(--text2); }
+  .sync-hint { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+
+  /* ── PWA: OFFLINE BANNER ── */
+  .offline-banner {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: #333;
+    color: #fff;
+    font-size: 13px;
+    text-align: center;
+    padding: 8px 16px;
+    z-index: 9999;
+    animation: slideDown .3s ease;
+  }
+  .offline-banner.show { display: block; }
+  @media (prefers-color-scheme: dark) { .offline-banner { background: #555; } }
+  @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+  /* ── PWA: INSTALL BANNER ── */
+  .install-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    background: var(--p1-bg);
+    border: 1px solid var(--p1-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin: 12px 16px 0;
+    font-size: 13px;
+    color: var(--p1);
+    z-index: 50;
+  }
+  .install-banner.show { display: flex; }
+  .install-banner-text { flex: 1; line-height: 1.4; }
+  .install-banner-text strong { font-weight: 600; }
+  .install-btn { padding: 7px 14px; border-radius: 8px; background: var(--p1); color: #fff; border: none; font-size: 13px; font-weight: 500; cursor: pointer; flex-shrink: 0; }
+  .install-dismiss { background: none; border: none; color: var(--text2); font-size: 18px; cursor: pointer; padding: 0 2px; flex-shrink: 0; line-height: 1; }
+
+  /* ── PWA: UPDATE BANNER ── */
+  .update-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    background: #EAF3DE;
+    border: 1px solid #97C459;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin: 12px 16px 0;
+    font-size: 13px;
+    color: var(--pos);
+  }
+  .update-banner.show { display: flex; }
+  .update-banner-text { flex: 1; }
+  .update-btn { padding: 7px 14px; border-radius: 8px; background: var(--pos); color: #fff; border: none; font-size: 13px; font-weight: 500; cursor: pointer; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- ── PWA: OFFLINE INDICATOR ── -->
+<div class="offline-banner" id="offline-banner">📵 You're offline — progress saved locally and will sync when reconnected</div>
+
+<!-- ── PWA: INSTALL PROMPT ── -->
+<div class="install-banner" id="install-banner">
+  <div class="install-banner-text"><strong>Add to Home Screen</strong><br>Install for instant offline access</div>
+  <button class="install-btn" id="install-btn">Install</button>
+  <button class="install-dismiss" id="install-dismiss" aria-label="Dismiss">×</button>
+</div>
+
+<!-- ── PWA: UPDATE AVAILABLE ── -->
+<div class="update-banner" id="update-banner">
+  <div class="update-banner-text">🔄 A new version is available</div>
+  <button class="update-btn" id="update-btn">Update</button>
+</div>
+
+<div class="save-toast" id="save-toast">✓ Progress saved</div>
+
+<div class="nav">
+  <div class="nav-title" style="display:flex;align-items:center;gap:8px;">
+    AQA Psychology
+    <span style="display:flex;align-items:center;gap:4px;margin-left:auto;">
+      <span class="sync-dot offline" id="nav-sync-dot"></span>
+      <span style="font-size:11px;color:var(--text2);font-weight:400;" id="nav-sync-txt">Connecting…</span>
+    </span>
+  </div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="showPage('plan',this)">Schedule</button>
+    <button class="tab-btn" onclick="showPage('topics',this)">Topics</button>
+    <button class="tab-btn" onclick="showPage('flashcards',this)">Flashcards</button>
+    <button class="tab-btn" onclick="showPage('progress',this)">Progress</button>
+  </div>
+</div>
+
+<!-- ═══════════ SCHEDULE PAGE ═══════════ -->
+<div class="page active" id="page-plan">
+  <div class="exam-cards">
+    <div class="exam-card p1"><div class="label">Paper 1</div><div class="date">15 May</div><div class="countdown" id="cd1"></div></div>
+    <div class="exam-card p2"><div class="label">Paper 2</div><div class="date">20 May</div><div class="countdown" id="cd2"></div></div>
+    <div class="exam-card p3"><div class="label">Paper 3</div><div class="date">5 June</div><div class="countdown" id="cd3"></div></div>
+  </div>
+  <div class="section-title">30-Day Plan</div>
+  <div class="day-list" id="day-list"></div>
+</div>
+
+<!-- ═══════════ TOPICS PAGE ═══════════ -->
+<div class="page" id="page-topics">
+  <p class="cycle-hint">Tap the circle to cycle: not started → needs review ✓ → mastered ✓✓</p>
+  <div id="topics-list"></div>
+</div>
+
+<!-- ═══════════ FLASHCARDS PAGE ═══════════ -->
+<div class="page" id="page-flashcards">
+  <div class="fc-controls">
+    <select class="fc-select" id="fc-filter" onchange="loadCards()">
+      <option value="all">All topics (67 cards)</option>
+      <option value="p1">── Paper 1</option>
+      <option value="Social influence">Social influence</option>
+      <option value="Memory">Memory</option>
+      <option value="Attachment">Attachment</option>
+      <option value="Psychopathology">Psychopathology</option>
+      <option value="p2">── Paper 2</option>
+      <option value="Approaches">Approaches</option>
+      <option value="Biopsychology">Biopsychology</option>
+      <option value="Research methods">Research methods</option>
+      <option value="p3">── Paper 3</option>
+      <option value="Relationships">Relationships</option>
+      <option value="Schizophrenia">Schizophrenia</option>
+      <option value="Forensic psychology">Forensic psychology</option>
+      <option value="Issues and debates">Issues and debates</option>
+    </select>
+    <div class="mode-group">
+      <button class="mode-btn active" id="mode-all" onclick="setMode('all')">Full</button>
+      <button class="mode-btn" id="mode-ao1" onclick="setMode('ao1')">AO1</button>
+      <button class="mode-btn" id="mode-ao3" onclick="setMode('ao3')">AO3</button>
+    </div>
+  </div>
+  <div class="fc-status">
+    <span class="fc-counter" id="fc-counter">1 / 67</span>
+    <div class="score-row">
+      <span class="score-item">✓ <span id="score-good">0</span></span>
+      <span class="score-item">✗ <span id="score-hard">0</span></span>
+    </div>
+  </div>
+  <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+  <div class="card-wrap">
+    <div class="flashcard" id="flashcard" onclick="revealCard()">
+      <div class="fc-meta">
+        <span class="fc-tag" id="fc-tag"></span>
+        <span class="paper-badge" id="fc-paper"></span>
+        <span class="fc-hint-label">Tap to reveal</span>
+      </div>
+      <div class="fc-q" id="fc-q"></div>
+      <div class="answer-section">
+        <div class="fc-a" id="fc-a"></div>
+        <div class="eval-grid" id="eval-grid">
+          <div class="eval-box pos"><div class="eval-lbl">✓ Strength</div><div class="eval-txt" id="eval-pos"></div></div>
+          <div class="eval-box neg"><div class="eval-lbl">✗ Limitation</div><div class="eval-txt" id="eval-neg"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="reveal-hint" id="reveal-hint">Tap the card to see the answer</div>
+  <div class="action-row" id="action-row" style="display:none;">
+    <button class="act-btn hard" onclick="nextCard(false)">✗ Tricky</button>
+    <button class="act-btn good" onclick="nextCard(true)">✓ Got it</button>
+  </div>
+</div>
+
+<!-- ═══════════ PROGRESS PAGE ═══════════ -->
+<div class="page" id="page-progress">
+  <div class="overall-stat">
+    <div class="overall-num" id="overall-pct">0%</div>
+    <div class="overall-label">topics mastered</div>
+  </div>
+  <div class="prog-section" id="progress-list"></div>
+
+  <!-- Sync code card -->
+  <div class="sync-bar">
+    <div class="sync-bar-title">☁ Cloud Sync</div>
+    <div class="sync-code-row">
+      <input class="sync-code" id="sync-code-display" readonly value="Loading…">
+      <button class="sync-action-btn" onclick="copySyncCode()">Copy</button>
+      <button class="sync-action-btn" onclick="changeSyncId()">Link device</button>
+    </div>
+    <div class="sync-status-row">
+      <span class="sync-dot offline" id="sync-dot"></span>
+      <span class="sync-status-txt" id="sync-status-txt">Connecting…</span>
+    </div>
+    <p class="sync-hint">Your <strong>Sync Code</strong> links your progress across devices. On your other device, tap "Link device" and enter this code. Keep it private.</p>
+  </div>
+
+  <p class="last-saved-txt" id="last-saved">No saved data</p>
+  <button class="reset-btn" onclick="resetState()">Reset all progress</button>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// PWA: SERVICE WORKER REGISTRATION & INSTALL PROMPT
+// ══════════════════════════════════════════════════════
+(function initPWA() {
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        // Check for update
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New version available
+              document.getElementById('update-banner').classList.add('show');
+              document.getElementById('update-btn').onclick = () => {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                window.location.reload();
+              };
+            }
+          });
+        });
+      }).catch(err => console.warn('SW registration failed:', err));
+
+      // Reload if SW takes control
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) { refreshing = true; window.location.reload(); }
+      });
+    });
+  }
+
+  // Offline / online detection
+  function updateOnlineStatus() {
+    const banner = document.getElementById('offline-banner');
+    if (!navigator.onLine) {
+      banner.classList.add('show');
+    } else {
+      banner.classList.remove('show');
+    }
+  }
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  updateOnlineStatus();
+
+  // Install prompt (beforeinstallprompt)
+  let deferredPrompt = null;
+  const installBanner = document.getElementById('install-banner');
+  const installBtn = document.getElementById('install-btn');
+  const dismissBtn = document.getElementById('install-dismiss');
+
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Only show if not previously dismissed
+    if (!localStorage.getItem('pwa_install_dismissed')) {
+      installBanner.classList.add('show');
+    }
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      installBanner.classList.remove('show');
+      localStorage.setItem('pwa_install_dismissed', '1');
+    }
+    deferredPrompt = null;
+  });
+
+  dismissBtn.addEventListener('click', () => {
+    installBanner.classList.remove('show');
+    localStorage.setItem('pwa_install_dismissed', '1');
+  });
+
+  // Hide install banner once installed
+  window.addEventListener('appinstalled', () => {
+    installBanner.classList.remove('show');
+    deferredPrompt = null;
+  });
+})();
+
+// ══════════════════════════════════════════════════════
+// APP DATA
+// ══════════════════════════════════════════════════════
+const TODAY = new Date(2026,3,26);
+
+const PLAN = [
+  {day:1,paper:'p1',topic:'Social influence',focus:'Conformity types & explanations — Asch, NSI vs ISI',date:new Date(2026,3,26)},
+  {day:2,paper:'p1',topic:'Social influence',focus:'Obedience — Milgram, situational variables, agentic state',date:new Date(2026,3,27)},
+  {day:3,paper:'p1',topic:'Social influence',focus:'Resistance, minority influence & social change',date:new Date(2026,3,28)},
+  {day:4,paper:'p1',topic:'Memory',focus:'Multi-store model & working memory model',date:new Date(2026,3,29)},
+  {day:5,paper:'p1',topic:'Memory',focus:'Forgetting, interference, retrieval failure & EWT',date:new Date(2026,3,30)},
+  {day:6,paper:'p1',topic:'Memory',focus:'Cognitive interview & anxiety in EWT',date:new Date(2026,4,1)},
+  {day:7,paper:'p1',topic:'Attachment',focus:'Caregiver interactions & Schaffer\'s stages',date:new Date(2026,4,2)},
+  {day:8,paper:'p1',topic:'Attachment',focus:'Bowlby\'s theory, animal studies & learning theory',date:new Date(2026,4,3)},
+  {day:9,paper:'p1',topic:'Attachment',focus:'Strange Situation, types & cultural variations',date:new Date(2026,4,4)},
+  {day:10,paper:'p1',topic:'Attachment',focus:'Romanian orphan studies & influence of early attachment',date:new Date(2026,4,5)},
+  {day:11,paper:'p1',topic:'Psychopathology',focus:'Definitions of abnormality — all four with evaluation',date:new Date(2026,4,6)},
+  {day:12,paper:'p1',topic:'Psychopathology',focus:'Phobias & OCD — characteristics, explanations, treatments',date:new Date(2026,4,7)},
+  {day:13,paper:'p1',topic:'Psychopathology',focus:'Depression — characteristics, cognitive explanation & CBT',date:new Date(2026,4,8)},
+  {day:14,paper:'p1',topic:'Paper 1 revision',focus:'Social influence & Memory: mixed flashcards, past questions',date:new Date(2026,4,9)},
+  {day:15,paper:'p1',topic:'Paper 1 revision',focus:'Attachment & Psychopathology: timed 16-mark essays',date:new Date(2026,4,10)},
+  {day:16,paper:'p1',topic:'Paper 1 revision',focus:'Full Paper 1 mock — timed conditions, mark scheme review',date:new Date(2026,4,11)},
+  {day:17,paper:'p1',topic:'Paper 1 revision',focus:'Weak spots from mock — targeted re-study',date:new Date(2026,4,12)},
+  {day:18,paper:'p1',topic:'Paper 1 revision',focus:'Essay plans for all 4 topics — structure & evaluation',date:new Date(2026,4,13)},
+  {day:19,paper:'p1',topic:'Paper 1 revision',focus:'Light review — flashcards, key terms. Rest up.',date:new Date(2026,4,14)},
+  {day:20,paper:'p1',topic:'EXAM — Paper 1',focus:'Social Influence · Memory · Attachment · Psychopathology',date:new Date(2026,4,15),exam:true},
+  {day:21,paper:'p2',topic:'Approaches',focus:'Behaviourist approach & social learning theory',date:new Date(2026,4,16)},
+  {day:22,paper:'p2',topic:'Approaches',focus:'Cognitive, biological, psychodynamic & humanistic',date:new Date(2026,4,17)},
+  {day:23,paper:'p2',topic:'Biopsychology',focus:'Neurons, synaptic transmission, NS & endocrine systems',date:new Date(2026,4,18)},
+  {day:24,paper:'p2',topic:'Biopsychology',focus:'Localisation, lateralisation & split-brain research',date:new Date(2026,4,19)},
+  {day:25,paper:'p2',topic:'EXAM — Paper 2',focus:'Approaches · Biopsychology · Research Methods',date:new Date(2026,4,20),exam:true},
+  {day:26,paper:'p2',topic:'Research methods',focus:'Experiments, sampling, ethics & variables',date:new Date(2026,4,21)},
+  {day:27,paper:'p2',topic:'Research methods',focus:'Observations, self-report, correlations & inferential stats',date:new Date(2026,4,22)},
+  {day:28,paper:'p2',topic:'Research methods',focus:'Statistical tests, levels of measurement, reporting',date:new Date(2026,4,23)},
+  {day:29,paper:'p3',topic:'Relationships',focus:'Sexual selection, evolutionary explanations & attraction',date:new Date(2026,4,24)},
+  {day:30,paper:'p3',topic:'Relationships',focus:'Filter theory, self-disclosure, physical attractiveness',date:new Date(2026,4,25)},
+  {day:31,paper:'p3',topic:'Relationships',focus:'SET, equity theory & Rusbult\'s investment model',date:new Date(2026,4,26)},
+  {day:32,paper:'p3',topic:'Relationships',focus:'Duck\'s phase model, virtual & parasocial relationships',date:new Date(2026,4,27)},
+  {day:33,paper:'p3',topic:'Schizophrenia',focus:'Classification, positive & negative symptoms, issues in diagnosis',date:new Date(2026,4,28)},
+  {day:34,paper:'p3',topic:'Schizophrenia',focus:'Biological & psychological explanations',date:new Date(2026,4,29)},
+  {day:35,paper:'p3',topic:'Schizophrenia',focus:'Drug therapy, CBT, family therapy & interactionist model',date:new Date(2026,4,30)},
+  {day:36,paper:'p3',topic:'Forensic psychology',focus:'Offender profiling — top-down vs bottom-up',date:new Date(2026,5,1)},
+  {day:37,paper:'p3',topic:'Forensic psychology',focus:'Biological & psychological explanations of offending',date:new Date(2026,5,2)},
+  {day:38,paper:'p3',topic:'Forensic psychology',focus:'Custodial sentencing, treatment programmes & recidivism',date:new Date(2026,5,3)},
+  {day:39,paper:'p3',topic:'Issues and debates',focus:'Gender bias, culture bias — alpha/beta bias, ethnocentrism',date:new Date(2026,5,4)},
+  {day:40,paper:'p3',topic:'EXAM — Paper 3',focus:'Issues & Debates · Forensic · Schizophrenia · Relationships',date:new Date(2026,5,5),exam:true},
+];
+
+const TOPICS = [
+  {unit:'Paper 1',paper:'p1',items:['Social influence','Memory','Attachment','Psychopathology']},
+  {unit:'Paper 2',paper:'p2',items:['Approaches','Biopsychology','Research methods']},
+  {unit:'Paper 3',paper:'p3',items:['Issues and debates','Forensic psychology','Schizophrenia','Relationships']},
+];
+
+const CARDS = [
+{topic:'Social influence',paper:'p1',q:'What are Kelman\'s three types of conformity?',a:'Compliance — publicly going along without private agreement. Identification — public and private acceptance to gain group membership, but temporary. Internalisation — genuine, permanent adoption of the group\'s belief system; maintained even outside the group\'s presence.',pos:'Supported by Asch\'s post-study interviews: most participants who conformed said they privately knew the majority was wrong but went along to avoid rejection — textbook compliance rather than internalisation.',neg:'The three types exist on a continuum rather than as discrete categories. In practice they overlap and shift over time — a person may start by complying and gradually internalise a view. The model describes types but does not explain the mechanisms.'},
+{topic:'Social influence',paper:'p1',q:'Explain normative and informational social influence (NSI & ISI).',a:'NSI: conforming to be liked and accepted — motivated by belonging needs. Occurs when we care about others\' opinions (e.g. Asch\'s line study). ISI: conforming because others are a source of information in ambiguous situations — motivated by accuracy needs (e.g. Sherif\'s autokinetic effect). NSI produces compliance; ISI produces internalisation.',pos:'Asch (1951) found 36.8% conformity in unambiguous perceptual tasks — explained by NSI since participants knew the correct answer. When written responses were used, conformity dropped dramatically — NSI motive removed.',neg:'Deutsch & Gerard\'s (1955) two-process model treats NSI and ISI as mutually exclusive, but in real situations both often operate simultaneously (e.g. new job contexts). The model underestimates their interaction.'},
+{topic:'Social influence',paper:'p1',q:'What were Milgram\'s key findings and variables?',a:'Base rate: 65% of participants delivered the maximum 450V shock to a confederate (actor). Proximity: teacher & learner in same room → 40%. Touch proximity → 30%. Remote instruction (phone) → 20.5%. Uniform: ordinary civilian giving orders → 20%. Institution: run-down building → 47.5%. Group effect: two confederate teachers rebelled → 10%.',pos:'High ecological validity for the conditions of obedience: participants showed genuine distress (sweating, trembling), suggesting the psychological experience was real even if the shock was not. Cross-cultural replications (e.g. Burger, 2009) produced broadly similar base rates.',neg:'Baumrind (1964) criticised the study on ethical grounds: participants experienced significant psychological distress; debriefing was inadequate by modern standards. Internal validity questioned by Perry (2012) — some participants suspected the confederate was an actor.'},
+{topic:'Social influence',paper:'p1',q:'Explain agentic state and legitimacy of authority (Milgram).',a:'Agentic state (Milgram, 1974): person acts as an agent for another\'s wishes, giving up personal responsibility. Opposed to autonomous state (acting independently). Legitimacy of authority: institutions (Yale University) give authority figures a perceived right to direct behaviour. Graduated commitment (foot-in-the-door): increasing shock level by 15V each time makes each step seem small.',pos:'Milgram\'s debriefing data: 74% of participants said they learned something important; most were glad to have participated. Shows agentic state can be psychologically powerful even when individuals know what they are doing is wrong.',neg:'The agentic state is a post-hoc explanatory concept — Milgram proposed it after the data was collected to explain rather than predict obedience. It is difficult to operationalise and measure independently.'},
+{topic:'Social influence',paper:'p1',q:'What is minority influence and what are Moscovici\'s conditions?',a:'Moscovici et al. (1969): consistent minority called blue slides "green" — 8.4% of trials, 32% of participants agreed at least once (vs 1.25% in inconsistent condition). Conditions for minority influence: Consistency (diachronic — over time, synchronic — between members), Commitment (making sacrifices), Flexibility (not rigid dogmatism), Autonomy (acting on principle not self-interest).',pos:'Nemeth (1986): minorities who maintained consistent positions led to more creative and divergent thinking in the majority — showing minorities generate genuine attitude change and deeper processing, not mere compliance.',neg:'Moscovici\'s original study used a simple perceptual task (colour) — low ecological validity. Minorities in real social contexts face much greater social pressure (social crypto-amnesia: ideas adopted but source forgotten), making the process harder to observe.'},
+{topic:'Social influence',paper:'p1',q:'How does social change occur through minority influence?',a:'Snowball effect: minority influence gradually spreads as more majority members are converted. Augmentation principle: willingness to suffer for beliefs increases persuasiveness. Social cryptomnesia: minority\'s ideas eventually adopted as the majority\'s own (source forgotten). Historical examples: suffragette movement, civil rights movement, environmental movement.',pos:'The suffragette movement demonstrates all key features: consistency (sustained campaign), commitment (imprisonment, hunger strikes), flexible (varied tactics). Eventually won women\'s right to vote — societal change confirmed.',neg:'Difficult to establish direct causation between minority influence and social change — many other factors (economic, political) operate simultaneously. Laboratory demonstrations of minority influence do not easily replicate to complex societal change.'},
+{topic:'Memory',paper:'p1',q:'Describe the Multi-Store Model of memory (Atkinson & Shiffrin, 1968).',a:'Three stores: Sensory Register (SR) — all senses, large capacity, very brief duration (¼–½ sec), lost via decay. Short-Term Memory (STM) — limited capacity (7±2 chunks, Miller, 1956), 18–30 sec duration, mainly acoustic encoding, lost via displacement/decay. Long-Term Memory (LTM) — unlimited capacity, lifetime duration, mainly semantic encoding. Transfer from SR→STM via attention; STM→LTM via rehearsal (maintenance or elaborative).',pos:'Supporting evidence: Glanzer & Cunitz (1966) serial position effect — primacy effect (LTM rehearsal) and recency effect (STM) shown in free recall; removing rehearsal opportunity abolishes primacy effect.',neg:'Case study of KF (Shallice & Warrington, 1970): brain damage left STM severely impaired but LTM intact — suggests separate stores, but KF\'s STM for verbal items was impaired yet visual STM was normal — shows STM is not a unitary store (contradicts MSM).'},
+{topic:'Memory',paper:'p1',q:'Describe the Working Memory Model (Baddeley & Hitch, 1974).',a:'Central Executive (CE): limited capacity, attentional control, coordinates the slave systems — no storage. Phonological Loop (PL): phonological store (inner ear, ~2 sec) + articulatory process (inner voice). Capacity limited by articulation speed. Visuo-Spatial Sketchpad (VSS): processes visual and spatial information ("inner eye"). Episodic Buffer (added 2000): 4 chunks, links WMM to LTM, integrates information across modalities.',pos:'Dual-task methodology: performing two tasks using the same slave system impairs performance; using different systems does not. Baddeley & Hitch (1976): concurrent digit span + reasoning task — performance reduced but not abolished, showing CE operates separately.',neg:'The Central Executive is the most important but least understood component — described as a homunculus (a "little person" inside). Without a clear specification of CE\'s precise mechanisms, the model has limited predictive power regarding CE failures.'},
+{topic:'Memory',paper:'p1',q:'Explain types of Long-Term Memory.',a:'Episodic memory (Tulving, 1972): autobiographical memory for specific events with context (what, where, when). Conscious, explicit. Semantic memory: knowledge of facts, concepts and language. Conscious, explicit. Procedural memory: knowing how to do things (motor skills — riding a bike). Implicit, unconscious; very resistant to forgetting. Declarative (episodic + semantic) vs non-declarative (procedural).',pos:'HM (Milner, 1966): bilateral hippocampal removal eliminated ability to form new episodic and semantic memories (anterograde amnesia) but procedural learning was intact — demonstrates a double dissociation confirming distinct LTM systems.',neg:'Tulving\'s distinctions are based heavily on memory impairment case studies — single case studies have limited generalisability. The exact neurological boundaries between systems overlap considerably; semantic and episodic memory share prefrontal and hippocampal involvement.'},
+{topic:'Memory',paper:'p1',q:'Explain interference theory as a cause of forgetting.',a:'Proactive interference (PI): older material interferes with recall of newer material. Retroactive interference (RI): newer material interferes with recall of older material. Interference is greatest when memories are similar. Tulving & Psotka (1971): demonstrated RI by adding more word categories — cued recall restored accuracy, showing interference not trace decay.',pos:'McGeoch & McDonald (1931): participants learned a list then learned a new list with similar/different words. Recall of original list most impaired when new list was synonyms — directly shows similarity determines interference. High internal validity.',neg:'Laboratory studies use word lists — low ecological validity. Everyday forgetting occurs in much more complex, emotionally loaded contexts. Interference theory does not explain forgetting of unique events (where no similar competing memory exists).'},
+{topic:'Memory',paper:'p1',q:'Explain retrieval failure (cue-dependent forgetting).',a:'Tulving\'s encoding specificity principle (1983): a retrieval cue is effective if it was encoded at the same time as the memory trace. Context-dependent forgetting: Godden & Baddeley (1975) — divers learned words on land/underwater; recall highest in the same environment. State-dependent forgetting: Goodwin et al. (1969) — information learned intoxicated recalled better when intoxicated.',pos:'Godden & Baddeley (1975): a 40% decrement in recall when context changed from learning to test — striking demonstration of environmental cue-dependency with real-world implications (studying where you will be tested).',neg:'Godden & Baddeley only found context-dependency with free recall — not with recognition tasks. This suggests retrieval failure is not a complete explanation of forgetting and recognition memory uses different retrieval mechanisms.'},
+{topic:'Memory',paper:'p1',q:'What factors affect the accuracy of eyewitness testimony (EWT)?',a:'Misleading information: Loftus & Palmer (1974) — "smashed" vs "hit" changed speed estimates (40.8 vs 31.8 mph) and subsequent recall (broken glass reported). Post-event discussion: contamination between co-witnesses (Gabbert et al., 2003 — 71% reported items they hadn\'t seen). Anxiety: Weapon focus effect (Loftus, 1979) — peripheral detail recall poorer; but Christianson & Hubinette (1993) — bank robbery victims recalled more detail than bystanders.',pos:'Loftus & Palmer (1974) is one of the most replicated findings in cognitive psychology, with direct applications to legal guidelines for police questioning of witnesses.',neg:'The anxiety-accuracy relationship is complex and non-linear. The Yerkes-Dodson law predicts optimal performance at moderate arousal. Johnson & Scott\'s weapon focus experiment used a confederate holding a pen vs a knife — demand characteristics may have influenced results.'},
+{topic:'Memory',paper:'p1',q:'Describe the cognitive interview (CI).',a:'Geiselman et al. (1985): four original techniques — (1) Mental reinstatement of context: mentally recreate the scene. (2) Report everything: all details, even if seemingly irrelevant. (3) Recall in different orders: reverse or different temporal order. (4) Change perspective: recall from different viewpoints. Enhanced CI (Fisher & Geiselman, 1992) added: build rapport, reduce anxiety, open questions, no interruptions.',pos:'Köhnken et al. (1999) meta-analysis of 55 studies: CI produced 34% more correct information than standard interview. Particularly effective for eyewitness contexts with sincere motivation to recall.',neg:'CI takes significantly longer than a standard interview — resource-intensive for police forces. Increase in correct information is accompanied by an increase in incorrect details in some studies. Results may depend heavily on interviewer training quality.'},
+{topic:'Attachment',paper:'p1',q:'Describe the development of attachment (Schaffer\'s stages).',a:'Schaffer & Emerson (1964): Glasgow study of 60 infants over 18 months. Stage 1 — Asocial/Diffuse (0–6 weeks): responds to stimuli, no preference. Stage 2 — Indiscriminate attachment (6 weeks–7 months): prefers humans over objects, equally content with anyone. Stage 3 — Specific/Single attachment (7 months+): separation anxiety to primary caregiver (usually mother). Stage 4 — Multiple attachments (8–9 months): extends to others.',pos:'Longitudinal design with naturalistic observation and parent diary — good ecological validity. Showed that the strongest attachment was to the most sensitive caregiver, not necessarily the mother or primary carer — directly challenges the view that attachment is automatic.',neg:'Sample limitations: 60 working-class families from Glasgow — limited cross-cultural and socioeconomic generalisability. Parent diary method relies on self-report — may be subject to social desirability bias (parents over- or under-reporting distress).'},
+{topic:'Attachment',paper:'p1',q:'Describe learning theory of attachment.',a:'Classical conditioning: food (UCS) → pleasure (UCR). Mother (NS) repeatedly paired with food → mother becomes CS → pleasure (CR). Operant conditioning (Dollard & Miller, 1950): drive reduction theory. Hunger (primary drive) → cry → fed → drive reduced → reinforcing, mother becomes secondary reinforcer (associated with drive reduction). Attachment = learned association.',pos:'Supports the role of feeding in early caregiver–infant relationships. Some animal evidence: imprinting in birds (Lorenz) involves early learning mechanisms.',neg:'Harlow (1959): rhesus monkeys with wire vs cloth surrogate mothers — spent 23 hours with cloth mother (contact comfort) even though wire mother provided milk. Directly refutes drive reduction/feeding theory — contact comfort > food as basis of attachment.'},
+{topic:'Attachment',paper:'p1',q:'Describe Bowlby\'s monotropic theory of attachment.',a:'Innate, evolved system for proximity-seeking with primary caregiver. Monotropy: one primary attachment figure (hierarchy of attachments). Sensitive period: first 2.5 years for formation; critical period if there is none. Internal working model (IWM): mental representation of self, others, relationships — template for future relationships. Social releasers: infant behaviours (smiling, cooing) trigger caregiving responses. Continuity hypothesis: early attachment predicts adult relationship style.',pos:'Lorenz (1935): imprinting in geese — evidence for critical period and innate attachment mechanism. Harlow\'s rhesus monkey work showed preference for contact comfort caregiver supports innate basis.',neg:'The concept of monotropy is now disputed — Schaffer & Emerson found multiple attachments develop almost simultaneously. The IWM is a useful theoretical concept but lacks precise operationalisation — hard to measure, test, and falsify.'},
+{topic:'Attachment',paper:'p1',q:'Describe the Strange Situation (Ainsworth et al., 1978) and attachment types.',a:'Controlled observation: 100 middle-class American mothers and infants (12–18 months). 7 episodes: separation, reunion, stranger introduction. Three attachment types: (A) Insecure-Avoidant (22%): not distressed on separation, avoids mother on reunion, not stranger anxious. (B) Secure (66%): moderate distress, enthusiastic reunion, stranger anxiety. (C) Insecure-Resistant/Ambivalent (12%): intense distress, difficult to comfort, resists contact. Main & Solomon (1990) added: (D) Disorganised.',pos:'High reliability: Ainsworth used time-sampling observations and multiple raters with high inter-rater agreement. Influential in guiding attachment-based clinical interventions for parents and children.',neg:'Conducted entirely on US white middle-class sample — low cultural validity. Takahashi (1990): Japanese infants showed high rates of type C (insecure-resistant) — not because of insensitive parenting, but because Japanese infants are rarely separated from their mothers. The SS creates artifactual distress.'},
+{topic:'Attachment',paper:'p1',q:'Describe cultural variations in attachment.',a:'Van IJzendoorn & Kroonenberg (1988): meta-analysis of 32 studies across 8 countries (n=1,990). Secure attachment was the most common type in all cultures. Most variation was within rather than between cultures (1.5× greater). Germany: high type A (independence valued). Japan: high type C (close mother–infant contact norm). Individual differences within cultures exceed cross-cultural differences.',pos:'The meta-analytic approach pools large samples and allows statistical comparison across cultures. The finding that secure attachment is universal supports Bowlby\'s claim that attachment has an evolved, biological basis.',neg:'Many cross-cultural studies use the US-derived Strange Situation — cultural equivalence is assumed but not demonstrated. The procedure may not have the same ecological validity in cultures where caregiver separation is very unusual (e.g. Japan). Translation and procedural differences may affect results.'},
+{topic:'Attachment',paper:'p1',q:'What are the effects of institutionalisation? (Romanian orphan studies)',a:'Rutter et al. (2011): English and Romanian Adoptees (ERA) study. 165 children adopted from Romanian orphanages into UK families. Adopted before 6 months: largely normal development. Adopted 6–24 months: some problems. After 24 months: intellectual impairment, disinhibited attachment (indiscriminate friendliness — a result of failing to form primary attachment during sensitive period), quasi-autism.',pos:'Natural experiment — ethical to study because adoption had occurred independently. Large longitudinal sample with matched UK adoptee controls. Direct test of Bowlby\'s sensitive period hypothesis.',neg:'Romanian institutions were particularly deprived (severe understimulation, neglect) — difficult to separate effects of privation from those of physical neglect and cognitive deprivation. Limited generalisability to other forms of early adversity.'},
+{topic:'Attachment',paper:'p1',q:'What is the influence of early attachment on later relationships?',a:'Bowlby\'s continuity hypothesis: secure IWM predicts secure adult romantic attachment style (Ainsworth\'s types map onto Hazan & Shaver\'s, 1987, adult types: secure/anxious-avoidant/anxious-resistant). McCarthy (1999): women with insecure childhood attachment had difficulties in adult friendships and romantic relationships. Internal working model acts as a template for later relationships.',pos:'Hazan & Shaver (1987) "love quiz" newspaper survey: 56% secure, 25% avoidant, 19% anxious — closely mirroring Ainsworth\'s infant proportions — consistent with continuity hypothesis across the lifespan.',neg:'The continuity hypothesis is correlational — early attachment and adult style may both reflect an underlying stable temperament rather than a causal relationship. Bailey et al. (2007): maternal sensitivity was a better predictor of adult attachment than childhood attachment type — challenges the deterministic view.'},
+{topic:'Psychopathology',paper:'p1',q:'What are the four definitions of abnormality?',a:'(1) Statistical Infrequency: behaviours occurring rarely in the population (below 2 SD from mean). (2) Deviation from Social Norms: violating implicit rules of a society/culture. (3) Failure to Function Adequately (FFA — Rosenhan & Seligman, 1989): unable to maintain relationships, hold employment, care for self; personal distress. (4) Deviation from Ideal Mental Health (Jahoda, 1958): lack of positive criteria — self-acceptance, autonomy, environmental mastery, resistance to stress.',pos:'FFA acknowledges the subjective experience of the individual and incorporates personal distress — making it clinically useful as an indicator that someone needs help regardless of whether their behaviour fits statistical norms.',neg:'All four definitions are culturally relative — norms, social rules, ideals of mental health, and functioning standards vary across cultures and historical periods. Statistical infrequency would classify very high IQ as abnormal. Social norm deviation can be used to oppress minority groups.'},
+{topic:'Psychopathology',paper:'p1',q:'Describe the characteristics, behavioural explanation and treatment for phobias.',a:'Characteristics: (B) avoidance, endurance; (C) anxiety, panic; (A) irrational thinking. Two-process model (Mowrer, 1960): Classical conditioning — acquisition (NS + UCS → phobic stimulus); Operant conditioning — maintenance (avoidance → negative reinforcement). Systematic desensitisation (Wolpe, 1958): anxiety hierarchy + relaxation training + gradual exposure. Flooding: immediate full exposure until anxiety extinguishes.',pos:'Little Albert (Watson & Rayner, 1920): classically conditioned fear of a white rat — direct experimental evidence for the acquisition of phobias. Ohman et al. (2001): phobias of evolutionary threats (snakes, spiders) are harder to extinguish — supports biological preparedness as a complementary mechanism.',neg:'Many people with phobias cannot identify a conditioning event — not all phobias are acquired through direct conditioning. Diathesis-stress model better explains individual differences in who develops phobias after equivalent experiences (e.g. only some develop PTSD after trauma).'},
+{topic:'Psychopathology',paper:'p1',q:'Describe OCD — characteristics, biological explanation and biological treatment.',a:'Characteristics: Obsessions (intrusive, recurrent, unwanted thoughts) + Compulsions (repetitive behaviours to reduce anxiety; ego-dystonic). Neural: OFC–caudate–thalamus loop — "brain\'s alarm system" stuck on. OFC overactive in OCD. Serotonin hypothesis: low serotonin implicated — SSRIs reduce symptoms. Genetic: COMT and SERT gene variants. Family concordance elevated.',pos:'Lewis (1936): 37% of OCD patients had parents with OCD — elevated family concordance. Nestadt et al. (2000): MZ concordance 68% vs DZ 31% — strong genetic component. SSRIs produce significant symptom reduction in ~60% of OCD patients.',neg:'OCD is highly heterogeneous — different symptom profiles may have different aetiologies. Serotonin hypothesis is based on treatment efficacy, not direct measurement — known as the "therapeutic fallacy." Correlation between SSRI response and serotonin does not prove low serotonin causes OCD.'},
+{topic:'Psychopathology',paper:'p1',q:'Describe depression — characteristics, cognitive explanation and CBT.',a:'Characteristics: Persistent low mood >2 weeks; anhedonia, fatigue, worthlessness, suicidal ideation. Beck\'s cognitive triad (1967): negative views of self, world, future. Cognitive distortions: overgeneralisation, catastrophising, selective abstraction. Ellis\'s ABC model: Activating event → Belief (irrational) → Consequence (emotional). CBT targets distorted cognitions through Socratic questioning, thought records, behavioural experiments.',pos:'CBT has a substantial evidence base. NICE (2009) recommends CBT as first-line psychological treatment for depression. Meta-analyses (Cuijpers et al., 2019) show CBT is significantly more effective than waiting list controls and comparable to antidepressants for mild-moderate depression.',neg:'Reciprocal determinism: does negative thinking cause depression or does depression cause negative thinking? Causality is unclear. CBT is less effective for severe depression and those with limited insight. Access within NHS is severely limited by waiting lists.'},
+{topic:'Approaches',paper:'p2',q:'Describe the behaviourist approach.',a:'Founded by Watson (1913) — "Psychology as the Behaviourist Views It." Assumptions: (1) All behaviour is learned from the environment. (2) Only observable, measurable behaviour should be studied. (3) Animal research is valid for human psychology. Learning by: Classical conditioning (Pavlov) — stimulus-response associations; Operant conditioning (Skinner) — behaviour shaped by consequences (reinforcement and punishment); Social Learning Theory (Bandura) — observational learning + vicarious reinforcement.',pos:'High scientific credibility — behaviourist research uses controlled laboratory experiments with operationalised variables and high internal validity. Applied behaviour analysis (ABA) has produced effective behaviour modification techniques used in autism, education, and clinical settings.',neg:'Ignores internal mental processes — Tolman\'s (1948) cognitive maps demonstrated rats learned spatial layouts even without reinforcement, behaviour unexplainable by stimulus-response conditioning. Behaviourism is now widely seen as reductionist and unable to explain complex human behaviour such as language acquisition.'},
+{topic:'Approaches',paper:'p2',q:'Describe the cognitive approach.',a:'Studies internal mental processes (thinking, perception, memory, language) using the information-processing model — input → processing → output. Theoretical models and computer analogies. Schema theory: mental frameworks that organise and interpret information. Cognitive neuroscience: links cognitive processes to brain structures. Key researchers: Bartlett (schemas), Broadbent (attention), cognitive model of depression (Beck).',pos:'Has produced highly successful applied approaches: CBT, cognitive interview, educational psychology. Cognitive neuroscience has identified neural correlates of specific cognitive processes using fMRI and EEG — bridging the gap between abstract cognitive models and biological reality.',neg:'The computer analogy is criticised as oversimplistic — it ignores the role of emotion and social context in cognition. Schemata are a useful concept but difficult to operationalise precisely. Most cognitive research uses laboratory tasks with low ecological validity.'},
+{topic:'Approaches',paper:'p2',q:'Describe the biological approach.',a:'Behaviour is determined by biological structures and processes: genetics, neurochemistry, neuroanatomy. Genotype influences phenotype (nature). Twin studies: MZ twins share 100% DNA; comparing MZ/DZ concordance separates genetic from environmental contributions. Neurochemistry: imbalances in neurotransmitters (serotonin, dopamine) underlie disorders. Evolutionary psychology: adaptationist explanations for behavioural traits.',pos:'Strong scientific methodology: twin studies, brain imaging, molecular genetics. Psychopharmacology — drugs targeting specific neurotransmitter systems have revolutionised treatment of mental disorders. Biological approach generates specific, falsifiable hypotheses.',neg:'Reductionist: reduces complex behaviour to biological components, ignoring cognitive, social and cultural factors. Concordance rates in twin studies for psychological traits are never 100%, showing environment is also necessary. Genetic determinism raises ethical concerns about eugenics and stigma.'},
+{topic:'Approaches',paper:'p2',q:'Describe the psychodynamic approach (Freud).',a:'Unconscious mind governs behaviour. Structure: Id (pleasure principle, unconscious), Ego (reality principle, conscious), Superego (moral principle, partly unconscious). Psychosexual stages: Oral, Anal, Phallic (Oedipus/Electra), Latency, Genital. Fixation at any stage causes adult psychological problems. Defence mechanisms (ego-protection): repression, projection, displacement, sublimation, regression.',pos:'The concept of the unconscious has influenced clinical practice enormously. Free association and dream analysis generate clinically rich material. Freud\'s focus on early experience anticipated later attachment theory and developmental psychology.',neg:'Unfalsifiable: unconscious motivations cannot be objectively verified or measured. Evidence largely from unrepresentative case studies (Viennese bourgeoisie). "Androcentric" — the theory pathologises women (penis envy). Grünbaum (1984) argued it lacks scientific validity.'},
+{topic:'Approaches',paper:'p2',q:'Describe the humanistic approach (Maslow & Rogers).',a:'Maslow\'s hierarchy of needs: physiological → safety → love/belonging → esteem → self-actualisation. Self-actualisation: realising full potential. Rogers\' person-centred therapy: conditions of worth create incongruence between self-concept and ideal self. Therapeutic conditions: empathy, unconditional positive regard (UPR), congruence. Client-centred counselling: non-directive, the client leads.',pos:'The humanistic approach explicitly acknowledges human agency, free will and subjective experience. Person-centred therapy has been widely adopted and demonstrated effectiveness in meta-analyses. Influenced counselling psychology, education, and workplace management.',neg:'Self-actualisation and the need hierarchy lack empirical support — difficult to measure or operationalise. The hierarchy is culturally biased (Suh et al., 1998 — collectivist cultures prioritise belonging over esteem). Criticised as overly optimistic about human nature.'},
+{topic:'Biopsychology',paper:'p2',q:'Describe neuron structure and synaptic transmission.',a:'Neuron types: sensory (receptor→CNS), motor (CNS→effector), relay/interneuron (CNS connections). Structure: dendrites → cell body (soma) → axon → myelin sheath (Schwann cells) → terminal buttons. Synaptic transmission: action potential → vesicles release neurotransmitters → diffuse across synapse → bind to post-synaptic receptors → EPSP or IPSP → reuptake or enzymatic breakdown. Excitatory (glutamate) vs inhibitory (GABA) neurotransmitters.',pos:'The understanding of synaptic transmission has directly informed psychopharmacology — SSRIs block serotonin reuptake to increase synaptic availability. Botulinum toxin prevents ACh release at neuromuscular junctions — medical applications in spasticity and cosmetic treatment.',neg:'Neurotransmitter function is far more complex than single-substance models suggest — most behaviours involve multiple neurotransmitters interacting. The reductionist focus on individual synaptic mechanisms cannot account for emergent properties of neural networks.'},
+{topic:'Biopsychology',paper:'p2',q:'Describe the nervous system and the endocrine system.',a:'CNS: brain + spinal cord. PNS: somatic (voluntary skeletal muscle control) + autonomic (ANS — involuntary: sympathetic (fight-or-flight: ↑HR, ↑BP, pupil dilation, adrenaline) and parasympathetic (rest-and-digest: ↑digestion, ↓HR)). Endocrine system: ductless glands secreting hormones into blood. Key glands: pituitary (master gland), adrenal (cortex: cortisol; medulla: adrenaline), thyroid, gonads (oestrogen, testosterone).',pos:'The stress response is a well-understood, evolutionarily adaptive system — Walter Cannon\'s fight-or-flight concept has been validated by extensive physiological research. Understanding HPA axis dysregulation in chronic stress has directly informed treatment of stress-related disorders.',neg:'The distinction between nervous and endocrine systems is oversimplified — neuroendocrine integration (e.g. hypothalamo-pituitary-adrenal axis) demonstrates they function as a unified system. Reducing behaviour to either system alone is an oversimplification.'},
+{topic:'Biopsychology',paper:'p2',q:'Describe localisation of function and hemispheric lateralisation.',a:'Localisation: specific brain regions have specific functions. Motor cortex (frontal lobe): voluntary movement. Somatosensory cortex (parietal): touch/pain. Visual cortex (occipital). Broca\'s area (left frontal): speech production. Wernicke\'s area (left temporal): language comprehension. Lateralisation: left hemisphere — language, logic, analytic; right hemisphere — spatial, creative, holistic. Contralateral control.',pos:'Broca (1861) and Wernicke (1874) case studies of patients with specific language deficits following specific lesions provided early compelling evidence for localisation. Modern neuroimaging (fMRI) confirms activation of Broca\'s area during speech production.',neg:'Neuroplasticity challenges strict localisation — following brain damage, functions can migrate to adjacent or homologous contralateral regions (particularly in children). Holistic theorists (Lashley — mass action and equipotentiality) suggest many functions are distributed across the brain.'},
+{topic:'Biopsychology',paper:'p2',q:'Describe split-brain research (Sperry, 1968).',a:'Corpus callosum severed to treat severe epilepsy. Sperry presented visual stimuli to one visual field only (controlled fixation). Key findings: image shown to left VF (RH) — could not name it verbally but could select matching object with left hand. Image to right VF (LH) — correctly named. RH could recognise faces better. Showed the two hemispheres have different specialisations and function independently when disconnected.',pos:'Provided definitive evidence for hemispheric lateralisation that could not be observed in intact brains. Sperry won the Nobel Prize (1981). Has informed our understanding of consciousness, language and hemispheric specialisation.',neg:'Generalising split-brain findings to healthy individuals with intact corpus callosa is problematic — normal brains have extensive interhemispheric communication. The sample was small and the patients had pre-existing epilepsy which may have altered brain organisation.'},
+{topic:'Research methods',paper:'p2',q:'What are the key features of experimental design?',a:'IV (manipulated by researcher) → DV (measured). Controls: extraneous variables (EVs) must be controlled; confounding variables (CVs) vary systematically with IV. Experimental designs: (1) Independent groups: different participants in each condition — individual differences confound. (2) Repeated measures: same participants in both — order effects (practice, fatigue), counterbalanced by ABBA. (3) Matched pairs: pairs matched on key variables — time-consuming.',pos:'Laboratory experiments have the highest internal validity of all research methods. Random allocation to conditions eliminates systematic individual difference confounds in independent groups designs.',neg:'Laboratory experiments often have low ecological validity and mundane realism — artificial tasks bear little resemblance to real-world behaviour. Demand characteristics (Orne, 1962) — participants guess the aim and behave accordingly, threatening internal validity.'},
+{topic:'Research methods',paper:'p2',q:'Describe sampling methods.',a:'Target population → sample. (1) Random: every member has equal chance — unbiased but difficult. (2) Opportunity: those available — easy but biased. (3) Volunteer/self-selected: responds to advert — motivated sample, may not represent population. (4) Systematic: every nth person. (5) Stratified: population divided into strata; proportional random sampling from each — most representative. (6) Quota: stratified without randomness.',pos:'Stratified sampling produces the most representative sample and allows subgroup comparisons. When applied rigorously, it substantially reduces sampling bias compared to opportunity sampling.',neg:'No sampling method is perfect. Volunteer samples systematically over-represent curious, cooperative individuals with higher SES and education (volunteer bias — Rosenthal & Rosnow). Most psychology research relies on opportunity samples (WEIRD populations — Henrich et al., 2010).'},
+{topic:'Research methods',paper:'p2',q:'Describe ethical issues in psychological research.',a:'BPS Code of Ethics: (1) Informed consent — participants must agree knowing what is involved. (2) Deception — only acceptable if unavoidable and debriefed. (3) Debriefing — full disclosure of aims after study; psychological distress managed. (4) Right to withdraw — at any time without penalty. (5) Confidentiality/anonymity — data protected. (6) Protection from harm — physical and psychological. (7) Competence of researcher.',pos:'Milgram\'s obedience studies revealed the ethical imperative clearly — participants experienced extreme psychological distress. The resulting debate led directly to the establishment of formal ethics committees (Institutional Review Boards) that protect participants globally.',neg:'Ethical guidelines can constrain research validity — if full consent is always given, demand characteristics increase. Some socially important research (e.g. studies of unconscious bias, crowd behaviour) requires deception to obtain natural behaviour.'},
+{topic:'Research methods',paper:'p2',q:'Describe observational research methods.',a:'Naturalistic observation: behaviour in natural environment — high ecological validity, no IV manipulation. Controlled observation: some variables controlled (e.g. Strange Situation). Covert vs overt: covert avoids demand characteristics but raises ethical issues. Participant vs non-participant. Behavioural categories: operationalised, mutually exclusive, exhaustive. Time sampling vs event sampling. Inter-rater reliability (IRR): agreement between observers — should use correlation or Cohen\'s kappa ≥ 0.80.',pos:'Ainsworth\'s Strange Situation — a controlled observation — achieved high inter-rater reliability through operationalised coding categories and multiple raters. The approach allowed systematic, replicable measurement of infant behaviour.',neg:'Naturalistic observation cannot establish cause and effect. Observer bias: researchers may selectively notice behaviour that confirms their hypothesis. Covert observation raises ethical concerns about consent.'},
+{topic:'Research methods',paper:'p2',q:'Describe self-report methods: questionnaires and interviews.',a:'Questionnaires: closed (Likert scale, fixed choice — quantitative, reliable) vs open questions (qualitative, rich data, hard to analyse). Interviews: structured (standardised — reliable), unstructured (flexible, naturalistic — valid), semi-structured (both). Social desirability bias: responding in a socially acceptable way — reduced by anonymity. Acquiescence bias: tendency to agree with statements regardless of content.',pos:'Large samples can be collected quickly and cheaply with questionnaires. Online surveys have massively increased sample diversity. Standardised questionnaires (e.g. Beck Depression Inventory) have been validated against clinical assessment.',neg:'Self-report methods rely on introspective access and honest responding — both problematic. Social desirability bias (Edwards, 1957) is particularly strong for sensitive topics. Questionnaire wording can lead participants toward particular responses (demand characteristics).'},
+{topic:'Research methods',paper:'p2',q:'Describe correlational research.',a:'Measures relationship between two co-variables (both measured, neither manipulated). Correlation coefficient: −1 (perfect negative) to +1 (perfect positive); 0 = no relationship. Pearson\'s r: parametric, interval data. Spearman\'s rho: non-parametric, ordinal data. Scatter diagrams display the relationship. CANNOT establish causation — third variable problem (both co-variables may be caused by an unmeasured third variable).',pos:'Correlational research can ethically investigate variables that cannot be experimentally manipulated (e.g. relationship between stress and illness). Can establish predictive relationships and identify variables worth studying experimentally.',neg:'Misinterpretation of causality is common. Ice cream sales correlate positively with drowning rates — both are caused by hot weather (third variable). Directional ambiguity: does depression cause negative cognition, or does negative cognition cause depression?'},
+{topic:'Research methods',paper:'p2',q:'Describe inferential statistics and significance testing.',a:'Null hypothesis (H0): no relationship/difference due to chance. Alternative hypothesis (H1): directional (one-tailed) or non-directional (two-tailed). Significance level: p ≤ 0.05 (5% probability result is due to chance — acceptable in psychology). p ≤ 0.01 for sensitive research. Type I error (false positive): rejecting true H0 (more likely at p=0.05). Type II error (false negative): retaining false H0 (more likely at p=0.01). Statistical tests: Mann-Whitney U, Wilcoxon, chi-square, Spearman\'s rho.',pos:'Inferential statistics allow researchers to make probabilistic decisions about whether results are likely to reflect real effects or sampling variation. The p ≤ 0.05 convention provides a consistent decision criterion across research contexts.',neg:'A significant result does not mean the effect is large or practically important — large samples can produce statistically significant but trivial effects (effect size measures like Cohen\'s d are also needed). Significance testing is increasingly recognised as insufficient without replication.'},
+{topic:'Relationships',paper:'p3',q:'Describe the evolutionary explanation for partner preferences (sexual selection).',a:'Darwin\'s sexual selection: intra-sexual selection (same-sex competition — men) + inter-sexual selection (mate choice — women). Anisogamy: sex cells differ in size/energy cost. Female egg: large, energetically costly, few. Male sperm: small, cheap, many. Females invest more (Trivers, 1972): gestation, lactation → choosy. Males: quantity strategy → compete for access. Female preferences: resources, status, dominance. Male preferences: fertility cues (youth, waist-hip ratio 0.7).',pos:'Buss (1989) 37-culture study (n=10,047): women universally valued resource acquisition more than men; men universally valued physical attractiveness and youth more than women — directly predicted by anisogamy and parental investment theory.',neg:'Evolutionary explanations are post-hoc and difficult to falsify — adaptationist stories can be constructed for any finding. Cultural variation in mate preference (Kenrick & Keefe, 1992) suggests social and economic factors play a significant role that evolution alone cannot explain.'},
+{topic:'Relationships',paper:'p3',q:'Describe the filter theory of attraction (Kerckhoff & Davis, 1962).',a:'Three sequential filters reduce the field of availables: (1) Social demography: proximity, class, ethnicity, religion — shared background. (2) Similarity in attitudes: couples whose values align progress; those who disagree filter each other out. (3) Complementarity of emotional needs: partners fulfil each other\'s emotional needs — most important in established relationships. Filters are used sequentially; different filters are important at different relationship stages.',pos:'Kerckhoff & Davis (1962): longitudinal study — short-term couples (< 18 months) were more influenced by attitude similarity; longer-term couples by complementarity. Provides evidence for the sequential nature of filters over time.',neg:'The study was conducted on American students in the 1960s — low ecological validity and generalisability. Modern relationship formation (dating apps) operates differently — the social demography filter operates very differently online where geographic proximity is irrelevant.'},
+{topic:'Relationships',paper:'p3',q:'Describe self-disclosure and physical attractiveness in relationships.',a:'Self-disclosure (Altman & Taylor, 1973): Social Penetration Theory — breadth and depth increase as relationships develop; reciprocity principle. Jourard (1971): intimacy deepens as partners match each other\'s disclosure. Physical attractiveness: halo effect — attractive people assumed to have positive traits. Matching hypothesis (Walster, 1966): people pair with others of similar attractiveness to balance rejection risk against desirability.',pos:'Computer dance study (Walster et al., 1966): participants randomly paired — only physical attractiveness predicted how much they liked their date, regardless of personality or intelligence. Effect was stronger than any other measured variable.',neg:'The matching hypothesis is correlational — it is difficult to separate whether similarity of attractiveness is based on realistic assessment of one\'s own attractiveness or on social processes of rejection and approach. Online communication may weaken the physical attractiveness filter.'},
+{topic:'Relationships',paper:'p3',q:'Describe Social Exchange Theory (Thibaut & Kelley, 1959).',a:'Economic framework: maximise rewards (companionship, sex, emotional support), minimise costs (time, stress, missed opportunities). Outcome = Rewards − Costs. Comparison Level (CL): expectation of what we deserve — if outcome > CL, we are satisfied. Comparison Level for Alternatives (CLalt): if outcome exceeds what we could get elsewhere, we stay. Minimax principle: seek to minimise costs and maximise rewards.',pos:'Explains why people remain in unsatisfying or even abusive relationships: if CLalt is very low (due to financial dependence, isolation, low self-esteem), the relationship is still calculated as "better than nothing."',neg:'The economic metaphor is reductionist. Humans frequently maintain costly relationships out of loyalty or moral obligation — altruistic behaviour contradicts the minimax principle. The theory is largely retrospective and difficult to use predictively.'},
+{topic:'Relationships',paper:'p3',q:'Describe equity theory (Walster et al., 1978).',a:'People seek fairness, not just maximum profit. Equity: each partner\'s ratio of rewards to costs is equal. Inequity causes distress for both the under-benefited (exploited) and over-benefited (guilt). People in inequitable relationships are motivated to restore equity — by changing behaviour, adjusting perception, or leaving. Hatfield et al. (1979): under-benefited people were less satisfied and more likely to leave.',pos:'Offers a more nuanced account than SET alone — explains why people in "advantageous" relationships are also dissatisfied. Accounts for long-term relationship dynamics where short-term imbalances are tolerated with an expectation of future repayment.',neg:'Treats relationships as economic transactions — culturally biased toward individualistic cultures. Moghaddam (1998) found that women in many cultures are socialised to expect and accept inequitable relationships, questioning the universality of the equity motivation.'},
+{topic:'Relationships',paper:'p3',q:'Describe Rusbult\'s investment model.',a:'Commitment is determined by three factors: (1) Satisfaction level — rewards minus costs relative to comparison level; (2) Quality of alternatives — how attractive are other options? (3) Investment size — resources that would be lost if the relationship ended (time, shared memories, children, finances). High investment and poor alternatives maintain commitment even when satisfaction is low.',pos:'Rusbult et al. (1998) tested the model across dating, married and same-sex couples in 5 studies using structural equation modelling. All three components independently predicted commitment and stability. The model has been applied to predict domestic violence victims\' decisions to leave.',neg:'Relies heavily on self-report — participants may lack accurate insight into their own commitment levels. Investment size is particularly subjective and culturally variable. The model describes but does not fully explain the psychological mechanisms connecting satisfaction to commitment.'},
+{topic:'Relationships',paper:'p3',q:'Describe Duck\'s phase model of relationship breakdown.',a:'Four phases: (1) Intra-psychic — one partner privately focuses on the other\'s failings (threshold: "I can\'t stand this"). (2) Dyadic — dissatisfaction confronted between partners (threshold: "I\'d be justified in withdrawing"). (3) Social — breakdown becomes public; social network involved (threshold: "I mean it"). (4) Grave-dressing — post-relationship narrative construction to protect self-image. Resurrection phase: preparing for new relationships.',pos:'The phase model captures the processual, non-linear nature of breakdown far better than models that treat it as a single event. Intervention at the intra-psychic phase (before confrontation) may prevent dissolution — applied in couples counselling.',neg:'Developed from retrospective self-report accounts subject to memory distortion and motivated reasoning. Assumes a relatively linear progression, but breakdown is often cyclical — couples may oscillate between phases repeatedly before finally separating.'},
+{topic:'Relationships',paper:'p3',q:'Describe virtual relationships and absent gating.',a:'Gating: features that inhibit FtF relationship formation (physical unattractiveness, shyness, disability). Online, these gates are absent. Hyperpersonal model (Walther, 1996): online communicators idealise partners and receive optimised, carefully composed messages — accelerating intimacy beyond FtF interaction. Reduced cues theory (Sproull & Kiesler, 1986): lack of non-verbal cues leads to de-individualisation and disinhibition.',pos:'Absence of gating democratises relationship formation for those who face social disadvantage in FtF contexts. McKenna & Bargh (2000) found people who disclosed their "true self" online were more likely to form lasting relationships.',neg:'Absence of gating enables deception — Whitty (2008) found catfishing (misrepresenting identity) was common in online dating, leading to disappointment and distrust. Rapid intimacy intensification may create unrealistic expectations that real relationships cannot sustain.'},
+{topic:'Relationships',paper:'p3',q:'Describe parasocial relationships and the absorption-addiction model.',a:'Horton & Wohl (1956): one-sided, unreciprocated relationships with media figures. The "fan" expends emotional energy and time; the celebrity is unaware of their existence. Celebrity Attitude Scale: entertainment-social (casual fan interest); intense-personal (strong emotional identification); borderline-pathological (obsessive). Absorption-addiction model (McCutcheon et al., 2002): initially pursued for entertainment, but for some, absorption increases in an addictive pattern.',pos:'Derrick et al. (2008) found participants reminded of a favourite celebrity showed improved self-regulatory behaviour, suggesting parasocial bonds can compensate for unmet social needs and promote wellbeing in the short term.',neg:'The absorption-addiction model implies a universal linear escalation, but most parasocial relationships remain at entertainment-social level. Whether obsessive celebrity worship causes poor mental health or results from pre-existing loneliness and insecure attachment is unclear — direction of causality is ambiguous.'},
+{topic:'Schizophrenia',paper:'p3',q:'Describe the classification and diagnosis of schizophrenia.',a:'DSM-5 requires: at least two of the following for one month (at least one must be 1–3): (1) delusions, (2) hallucinations, (3) disorganised speech, (4) grossly disorganised/catatonic behaviour, (5) negative symptoms. Must persist 6 months. Positive symptoms: hallucinations (typically auditory), delusions (fixed false beliefs), disorganised speech (word salad). Negative symptoms: avolition, alogia, affective flattening, anhedonia. Issues: co-morbidity, symptom overlap with bipolar, culture and gender bias.',pos:'The positive/negative distinction has good clinical utility — positive symptoms respond better to antipsychotics while negative symptoms are more persistent. This guides treatment decisions. The distinction is supported by factor analytic studies of symptom clustering.',neg:'Rosenhan (1973) "On being sane in insane places" — pseudopatients admitted and labelled schizophrenic for an average of 19 days. Despite DSM revisions, inter-rater reliability for schizophrenia remains lower than other diagnoses (Regier et al., 2013 kappa ~0.46).'},
+{topic:'Schizophrenia',paper:'p3',q:'Describe the biological explanations for schizophrenia.',a:'Genetic: Gottesman (1991) — general population 1%; sibling ~9%; DZ twin ~17%; MZ twin ~48%. Suggests strong genetic component but also environmental role. Dopamine hypothesis: excess dopamine in the mesolimbic pathway causes positive symptoms — supported by antipsychotics blocking D2 receptors. Revised: hypoactivity in mesocortical pathway causes negative symptoms. Neural correlates: enlarged ventricles (Johnstone et al., 1976), reduced prefrontal activity ("hypofrontality").',pos:'Antipsychotics (D2 antagonists) effectively reduce positive symptoms in ~80% of patients. Amphetamines (which increase dopamine) reliably trigger psychotic episodes in healthy individuals — powerful pharmacological evidence for the dopamine hypothesis.',neg:'Antipsychotics block D2 receptors immediately yet take 2–4 weeks to reduce symptoms — arguing against a simple excess-dopamine model. The NMDA receptor hypofunction hypothesis offers a competing biological account. MZ concordance never 100% — diathesis-stress model is now preferred.'},
+{topic:'Schizophrenia',paper:'p3',q:'Describe psychological explanations for schizophrenia: family dysfunction.',a:'Schizophrenogenic mother (Fromm-Reichmann, 1948): cold, dominant, rejecting mothers create distrust leading to paranoid delusions. Double bind theory (Bateson et al., 1972): contradictory parental messages leave children unable to interpret reality. High expressed emotion (EE): Vaughn & Leff (1976) — high-EE households produced 51% relapse rates vs. 13% in low-EE households over 9 months.',pos:'High expressed emotion has the strongest evidence: Butzlaff & Hooley (1998) meta-analysis of 27 studies confirmed high-EE environments predict significantly higher relapse rates. Family therapy targeting EE is one of the most effective schizophrenia interventions — endorsed by NICE.',neg:'The schizophrenogenic mother concept is now largely discredited — it pathologised mothers without robust evidence. As a correlational finding, high EE in families could be a response to a difficult-to-manage family member rather than its cause. Direction of causality is unclear.'},
+{topic:'Schizophrenia',paper:'p3',q:'Describe drug therapy for schizophrenia.',a:'Typical antipsychotics (1950s — chlorpromazine): dopamine antagonists blocking D2 receptors, reducing positive symptoms; 400–800mg daily. Side effects: tardive dyskinesia, Parkinsonism, sedation. Atypical antipsychotics (1990s — clozapine, risperidone): target dopamine and serotonin; effective for both positive and negative symptoms; fewer motor side effects. Clozapine: most effective for treatment-resistant SZ but risk of agranulocytosis (1–2%) — requires blood monitoring.',pos:'Atypical antipsychotics have demonstrated superior efficacy over typicals in treatment-resistant schizophrenia. Meltzer (1997) found clozapine significantly reduced both positive and negative symptoms in patients who had failed two prior antipsychotics.',neg:'Drug therapy treats symptoms rather than causes; many patients discontinue due to side effects, leading to relapse. Tardive dyskinesia is irreversible in ~50% of cases. NICE recommends combined drug therapy and CBT — drugs alone have limited effect on negative symptoms and quality of life.'},
+{topic:'Schizophrenia',paper:'p3',q:'Describe CBT and family therapy for schizophrenia.',a:'CBTp: typically 16–20 sessions. Assessment → Engagement (therapist empathises) → ABC model → Normalisation (reducing distress by explaining psychotic experiences are on a continuum) → Challenging distorted beliefs about voices and delusions. Family therapy: reduces expressed emotion via psychoeducation (explaining schizophrenia), improving communication, reducing criticism and over-involvement.',pos:'NICE (2014) recommends both CBTp and family therapy for all people with schizophrenia. Pharoah et al. (2010) meta-analysis found family therapy significantly reduced relapse rates. CBTp is the only NICE-recommended psychological therapy for positive psychotic symptoms.',neg:'CBTp effect sizes for schizophrenia are generally modest (Wykes et al., 2008: d=0.40). Severely disorganised patients may lack the cognitive capacity to engage with therapy. Access to trained CBTp therapists within NHS services is extremely limited.'},
+{topic:'Schizophrenia',paper:'p3',q:'Describe the diathesis-stress (interactionist) model of schizophrenia.',a:'Neither genetic vulnerability (diathesis) nor environmental stress alone is sufficient — both are required. Diathesis: genetic predisposition, neurobiological anomalies, prenatal complications. Stress triggers: cannabis use, childhood trauma, high expressed emotion, urban living, social isolation, migration. Zubin & Spring (1977) formalised this for schizophrenia. Implies integrated treatment: antipsychotic medication combined with CBT and family therapy.',pos:'Supported by MZ twin concordance (~48%) being well above the population rate yet not 100% — exactly the pattern predicted by a vulnerability-stress model. Directly generates the recommendation that combined biological and psychological treatment is superior to either alone.',neg:'The model is broad and vague about what constitutes a threshold of vulnerability or how much stress is required. Precise measurement of vulnerability is difficult. The model focuses too narrowly on stress as an environmental factor, ignoring broader social and economic determinants of schizophrenia.'},
+{topic:'Forensic psychology',paper:'p3',q:'Describe the top-down (FBI) approach to offender profiling.',a:'Developed by the FBI\'s Behavioural Science Unit in the 1970s from in-depth interviews with 36 sexually motivated serial killers. Organised offender: intelligent, socially competent, planned crime, controlled crime scene, targeted victim. Disorganised offender: below average intelligence, socially inadequate, spontaneous crime, chaotic crime scene. Crime scene evidence is matched to the typology to generate a profile.',pos:'The top-down approach has been used in high-profile cases. Douglas & Olshaker documented cases where FBI profiling accurately identified demographic characteristics. The organised/disorganised distinction is conceptually intuitive and easy for investigators to apply.',neg:'Based on only 36 offenders — an extremely small, non-representative sample. Canter et al. (2004) found most crime scenes were predominantly organised rather than fitting the typology. Copson (1995): profiling directly identified the offender in only 2.7% of UK cases where used.'},
+{topic:'Forensic psychology',paper:'p3',q:'Describe the bottom-up (Canter) approach to offender profiling.',a:'Data-driven and empirically grounded. Investigative psychology: statistical analysis of large crime databases identifies behavioural patterns. Interpersonal coherence principle: the way an offender behaves at the crime scene reflects their everyday behaviour. Forensic awareness: attempting to cover tracks suggests prior police contact. Geographical profiling (Rossmo, 1997): uses crime scene locations to infer the offender\'s likely home base.',pos:'Canter\'s profile of the "Railway Killer" (John Duffy) was highly accurate, correctly predicting geographic location, occupation and relationship status. Computerised geographic profiling systems (e.g. Rigel) are now used by police forces internationally.',neg:'Depends on accuracy of crime databases — patterns derived from recorded crime data may not represent actual offending (dark figure of crime). The interpersonal coherence assumption is theoretically plausible but empirically difficult to test rigorously.'},
+{topic:'Forensic psychology',paper:'p3',q:'Describe biological explanations of offending.',a:'Atavistic form (Lombroso, 1876): criminals are evolutionary throwbacks with distinguishable cranial features — now entirely discredited (pseudoscience). Genetic: Lange (1930) twin study; MAOA ("warrior gene") associated with reduced impulse control. Neural: low serotonin linked to impulsive aggression; amygdala dysfunction associated with psychopathy; prefrontal cortex damage linked to poor planning. Raine et al. (1997): brain imaging of murderers.',pos:'Raine et al. (1997) used PET scanning to show convicted murderers had significantly reduced prefrontal cortex activation compared to matched controls — providing objective neurological evidence for a biological basis of violent crime.',neg:'Genetic concordance for criminal behaviour is never 100% in MZ twins — genes alone do not determine offending. Social factors interact with biology. The atavistic form is entirely discredited. Biological explanations risk genetic determinism and may be misused to justify discrimination.'},
+{topic:'Forensic psychology',paper:'p3',q:'Describe Eysenck\'s theory of the criminal personality.',a:'Criminals score high on: Extraversion (E) — socially competent, impulsive, sensation-seeking; high-E cortical under-arousal means poor conditioning and conscience acquisition. Neuroticism (N) — emotionally unstable; crime committed under stress; N amplifies E. Psychoticism (P) — cold, aggressive, lacking empathy; most strongly predicts criminality. Measured by the Eysenck Personality Inventory (EPI/EPQ).',pos:'Eysenck & Gudjonsson (1989) found prisoners scored significantly higher on E, N and P than matched non-criminal controls. The theory generates specific, testable predictions about conditionability that can be measured in laboratory aversion conditioning studies.',neg:'Research support is inconsistent — high P scores are found in criminals more reliably than high E or N. Many criminals score low on extraversion. The EPQ relies on self-report from prisoners who may fake responses. The theory ignores economic deprivation and opportunity.'},
+{topic:'Forensic psychology',paper:'p3',q:'Describe cognitive explanations of offending (Kohlberg\'s moral reasoning).',a:'Kohlberg (1958): three levels of moral reasoning — Pre-conventional (punishment avoidance, personal gain); Conventional (social rules and laws); Post-conventional (abstract universal principles). Most criminals remain at pre-conventional level. Differential Association Theory (Sutherland, 1939): criminal behaviour is learned through intimate relationships when pro-criminal definitions outweigh anti-criminal ones.',pos:'Palmer & Hollin (1998) found young offenders scored at significantly lower moral reasoning stages than non-offenders. Cognitive skills programmes (Reasoning and Rehabilitation) based on moral reasoning training have demonstrated measurable reductions in recidivism in meta-analyses.',neg:'Kohlberg\'s research was conducted only on American boys — Gilligan (1982) demonstrated gender bias: female moral reasoning focuses on care and relationships, yet this was classified as "lower." Gibbs (1979) argued the post-conventional stage reflects Western cultural values only.'},
+{topic:'Forensic psychology',paper:'p3',q:'Describe custodial sentencing and psychological treatments for offending.',a:'Aims of custody: deterrence, retribution, incapacitation, rehabilitation. UK prison population 2023/24: ~91,500. Recidivism: ~48% reoffend within one year. Anger management (Novaco, 1975): 3 phases — cognitive preparation (identify triggers), skill acquisition (coping strategies — positive self-talk, counting), application practice. Token economy: desirable behaviours reinforced with exchangeable tokens. Restorative justice: offender confronts victim, acknowledges harm, provides reparation.',pos:'Meta-analyses (Lipsey, 1995) show cognitive-behavioural programmes reduce recidivism by 10–30%. Shapland et al. (2008) UK study showed restorative justice produced a 14% reduction in frequency of reoffending and high victim satisfaction.',neg:'High recidivism rates (~48%) demonstrate custodial sentencing alone is largely ineffective for rehabilitation. The prison environment may reinforce criminal behaviour through criminal peer networks. Token economies may not generalise beyond the institutional setting.'},
+{topic:'Issues and debates',paper:'p3',q:'Describe gender bias: alpha and beta bias, androcentrism.',a:'Alpha bias: exaggerates differences between men and women, often devaluing women (e.g. Freud\'s theory). Beta bias: minimises or ignores gender differences, typically by researching only male samples and generalising to all humans (e.g. Kohlberg\'s research; much early cognitive/physiological research). Androcentrism: using male experience as the norm (e.g. fight-or-flight stress response based on male samples; female response is "tend-and-befriend" — Taylor et al., 2000).',pos:'Recognition of beta bias has led to significant improvements — NIH now mandates inclusion of female participants. Feminist psychology has developed participant-centred research methodologies that better capture women\'s experiences.',neg:'Attempts to correct gender bias risk introducing alpha bias — emphasising gender differences can reinforce stereotypes used to justify discrimination. Intersectionality (Crenshaw, 1989) argues gender bias cannot be understood in isolation from race and class.'},
+{topic:'Issues and debates',paper:'p3',q:'Describe cultural bias: ethnocentrism and cultural relativism.',a:'Cultural bias: judging other cultures by the standards of one\'s own (ethnocentrism). Most prominent psychologists have been Western; most participants are WEIRD (Western, Educated, Industrialised, Rich, Democratic — Henrich et al., 2010). Cultural relativism: behaviours can only be understood within their own cultural context. Examples: Ainsworth\'s Strange Situation assumes maternal separation anxiety is universally problematic; Kohlberg\'s post-conventional stage reflects Western liberal values.',pos:'Cross-cultural research (e.g. Buss\'s 37-culture study) can identify truly universal patterns versus culturally specific ones — essential for distinguishing evolved behaviour from cultural norms. Recognition of cultural bias has promoted more globally representative research practices.',neg:'Cultural relativism taken to its extreme implies all cultural practices must be accepted without criticism, even those involving harm. This creates ethical tensions — complete cultural relativism is not a morally defensible position for a science aiming to promote human wellbeing.'},
+{topic:'Issues and debates',paper:'p3',q:'Describe free will vs determinism in psychology.',a:'Free will: humans have the capacity to choose voluntarily (humanistic approach). Hard determinism: all behaviour is causally determined; free will is an illusion. Soft determinism (compatibilism — William James): behaviour is determined by internal psychological causes but we experience choice subjectively. Types: biological determinism (genes, neurochemistry), environmental determinism (reinforcement history — behaviourism), psychic determinism (unconscious drives — Freud).',pos:'Scientific determinism underpins psychology\'s claim to be a science — if behaviour has identifiable causal antecedents, it can be predicted and improved. Libet\'s (1983) EEG studies showing neural "readiness potential" precedes conscious awareness of intention by ~500ms provides neurological evidence for determinism.',neg:'Hard determinism is incompatible with legal and moral systems that assume personal responsibility. If behaviour is entirely caused by prior events, punishment and moral blame become philosophically incoherent. Libet\'s results have been argued by Haggard to have been over-interpreted.'},
+{topic:'Issues and debates',paper:'p3',q:'Describe the nature-nurture debate and the interactionist approach.',a:'Nature: behaviour determined by innate biological factors — genes, neurochemistry, brain structure, evolution. Supported by: Piaget\'s universal stages, Chomsky\'s language acquisition device, twin studies in psychiatry. Nurture: behaviour determined by environment and experience. Supported by: Little Albert, behavioural therapies, cross-cultural variations. Interactionist view (modern consensus): nature and nurture interact bidirectionally. Epigenetics — experiences alter gene expression. Diathesis-stress model.',pos:'Twin studies illustrate the nature-nurture interaction: MZ twins reared apart show substantial similarity (genetic contribution) but are not identical (environmental influence) — precisely what the interactionist model predicts.',neg:'It is practically impossible to completely separate nature from nurture — genes are always expressed in an environment. Heritability estimates apply only to a specific population in a specific environment and cannot be generalised beyond that context.'},
+{topic:'Issues and debates',paper:'p3',q:'Describe holism vs reductionism.',a:'Reductionism: explains complex phenomena by breaking them into simpler parts. Biological reductionism — reduces behaviour to neurochemistry and genetics. Environmental (S-R) reductionism — reduces behaviour to learned stimulus-response associations. Scientific parsimony: explanations should be as simple as possible. Holism (Gestalt): the whole is more than the sum of its parts; behaviour can only be understood by considering the whole person in their social context.',pos:'Reductionism enables precise scientific investigation and has generated effective interventions (antipsychotics, SSRIs). Holistic approaches (systemic family therapy for schizophrenia) have also demonstrated effectiveness — multiple levels of explanation are valid and complementary.',neg:'Strict reductionism loses the emergent properties that arise at higher levels of organisation — consciousness and social meaning cannot be adequately explained neurochemically. Pure holism is scientifically intractable — if everything must be considered, controlled hypothesis testing becomes impossible.'},
+{topic:'Issues and debates',paper:'p3',q:'Describe the idiographic vs nomothetic approaches.',a:'Nomothetic (from Greek "nomos" — law): aims to identify universal laws applicable to all people. Uses large samples, quantitative methods, standardised tests. Associated with biological, cognitive and behaviourist approaches. Idiographic (from Greek "idios" — own/private): focuses on the unique individual. Uses case studies, unstructured interviews, qualitative methods. Associated with humanistic psychology and Freudian case studies. Allport argued both are necessary.',pos:'The nomothetic approach enables replicable, generalisable findings underpinning clinical diagnosis (DSM/ICD) and evidence-based treatment. The idiographic approach ensures individual complexity is not lost — vital in therapy where treatment must be tailored to the individual.',neg:'Presenting the two as opposites creates a false dichotomy — most modern research uses mixed methods. Pure idiographic research cannot generalise beyond the individual studied. Pure nomothetic research produces population averages that may not apply to any specific individual.'},
+{topic:'Issues and debates',paper:'p3',q:'What are the ethical implications of psychological research, including social sensitivity?',a:'BPS guidelines: Consent, Deception (only when necessary; debrief required), Confidentiality/privacy, Debrief, Right to withdraw, Protection from harm. Socially sensitive research (Sieber & Stanley, 1988): research with potential consequences for the participants or the group they represent. Examples: race and IQ research; genetic bases of criminality; attachment and maternal employment. Such research can be misused politically and may impact public policy in harmful ways.',pos:'Ethical guidelines have evolved significantly in response to past abuses (Tuskegee, Milgram). Modern ethics committees (IRBs, BPS) provide independent oversight. Socially sensitive research also generates important benefits — HIV research in marginalised communities has saved lives.',neg:'Tension between scientific value and ethical restrictions: Milgram\'s studies generated invaluable insights now prohibited. Over-restriction of socially sensitive research may leave important questions unanswered, leaving policy decisions based on intuition rather than evidence.'},
+];
+
+// ── FIREBASE ──
+const firebaseConfig = {
+  apiKey: "AIzaSyDy-6MjUedySukT9HoWPhxui69cyAFcgL8",
+  authDomain: "aqa-psychology-revision-app.firebaseapp.com",
+  projectId: "aqa-psychology-revision-app",
+  storageBucket: "aqa-psychology-revision-app.firebasestorage.app",
+  messagingSenderId: "386366328428",
+  appId: "1:386366328428:web:ce82d53ac16a902bc21249",
+  measurementId: "G-LQ90X0QWX9"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ── SYNC ID ──
+const SYNC_ID_KEY = 'aqa_sync_id';
+const STORE_KEY   = 'aqa_psych_v1';
+
+function getSyncId(){
+  let id = localStorage.getItem(SYNC_ID_KEY);
+  if(!id){
+    id = (crypto.randomUUID ? crypto.randomUUID()
+      : Math.random().toString(36).substr(2,9) + Date.now().toString(36));
+    localStorage.setItem(SYNC_ID_KEY, id);
+  }
+  return id;
+}
+
+let syncId = getSyncId();
+
+function setSyncStatus(status, msg){
+  const texts = { syncing:'Syncing…', synced:'Synced ✓', offline:'Offline — using local data', error:'Sync error' };
+  const label = msg || texts[status] || status;
+  ['nav-sync-dot','sync-dot'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.className='sync-dot '+status; }
+  });
+  ['nav-sync-txt','sync-status-txt'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent=label;
+  });
+}
+
+function updateLastSavedUI(iso){
+  const d=new Date(iso);
+  const str=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' at '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const el=document.getElementById('last-saved');
+  if(el) el.textContent='Last saved '+str;
+}
+
+function updateSyncCodeUI(){
+  const el=document.getElementById('sync-code-display');
+  if(el) el.value=syncId;
+}
+
+async function saveState(){
+  const state={topicStatus,cardScores,lastSaved:new Date().toISOString()};
+  try{ localStorage.setItem(STORE_KEY,JSON.stringify(state)); }catch(e){}
+  updateLastSavedUI(state.lastSaved);
+  setSyncStatus('syncing');
+  try{
+    await db.collection('progress').doc(syncId).set(state);
+    setSyncStatus('synced');
+    showSaveToast();
+  }catch(e){
+    setSyncStatus('offline');
+    showSaveToast(); // still show toast — saved locally
+  }
+}
+
+function applyState(state){
+  if(state.topicStatus) topicStatus=state.topicStatus;
+  if(state.cardScores)  cardScores =state.cardScores;
+  if(state.lastSaved)   updateLastSavedUI(state.lastSaved);
+}
+
+function loadFromLocalStorage(){
+  try{
+    const raw=localStorage.getItem(STORE_KEY);
+    if(raw) applyState(JSON.parse(raw));
+  }catch(e){}
+}
+
+async function loadState(){
+  setSyncStatus('syncing');
+  updateSyncCodeUI();
+  try{
+    const doc=await db.collection('progress').doc(syncId).get();
+    if(doc.exists){
+      const data=doc.data();
+      applyState(data);
+      try{ localStorage.setItem(STORE_KEY,JSON.stringify(data)); }catch(e){}
+      setSyncStatus('synced');
+    } else {
+      loadFromLocalStorage();
+      setSyncStatus('synced','Ready to sync');
+    }
+  }catch(e){
+    loadFromLocalStorage();
+    setSyncStatus('offline');
+  }
+}
+
+function copySyncCode(){
+  const val=document.getElementById('sync-code-display').value;
+  navigator.clipboard.writeText(val).then(()=>{
+    const btn=event.target;
+    btn.textContent='Copied!';
+    setTimeout(()=>btn.textContent='Copy',2000);
+  }).catch(()=>{
+    document.getElementById('sync-code-display').select();
+    document.execCommand('copy');
+  });
+}
+
+function changeSyncId(){
+  const newId=prompt('Paste the Sync Code from your other device:');
+  if(!newId||!newId.trim()) return;
+  const clean=newId.trim();
+  localStorage.setItem(SYNC_ID_KEY,clean);
+  syncId=clean;
+  topicStatus={};cardScores={};
+  document.getElementById('score-good').textContent=0;
+  document.getElementById('score-hard').textContent=0;
+  updateSyncCodeUI();
+  loadState().then(()=>{ buildTopicList(); updateProgress(); loadCards(); });
+}
+
+function resetState(){
+  if(!confirm('Reset all progress on ALL devices? This cannot be undone.')) return;
+  topicStatus={};cardScores={};
+  scoreGood=0;scoreHard=0;
+  document.getElementById('score-good').textContent=0;
+  document.getElementById('score-hard').textContent=0;
+  try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+  const el=document.getElementById('last-saved');
+  if(el) el.textContent='No saved data';
+  setSyncStatus('syncing');
+  db.collection('progress').doc(syncId).delete()
+    .then(()=>setSyncStatus('synced','Reset complete'))
+    .catch(()=>setSyncStatus('offline'));
+  buildTopicList(); updateProgress(); loadCards();
+}
+
+let _toastTimer=null;
+function showSaveToast(){
+  const t=document.getElementById('save-toast');
+  if(!t) return;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+let topicStatus={};
+let cardScores={};
+let filtered=[...CARDS];
+let idx=0,revealed=false,scoreGood=0,scoreHard=0,mode='all';
+
+// ── INIT ──
+async function init(){
+  buildCountdowns();
+  buildDayList();
+  await loadState();
+  buildTopicList();
+  loadCards();
+}
+
+function daysUntil(d){
+  return Math.ceil((d-TODAY)/(1000*60*60*24));
+}
+
+function buildCountdowns(){
+  const dates=[[new Date(2026,4,15),'cd1'],[new Date(2026,4,20),'cd2'],[new Date(2026,5,5),'cd3']];
+  dates.forEach(([d,id])=>{
+    const n=daysUntil(d);
+    document.getElementById(id).textContent=n>0?n+' days':n===0?'Today!':'Done';
+  });
+}
+
+function buildDayList(){
+  const dl=document.getElementById('day-list');
+  PLAN.forEach(d=>{
+    const isToday=d.date.toDateString()===TODAY.toDateString();
+    const div=document.createElement('div');
+    div.className='day-row '+(d.exam?'exam-day':d.paper);
+    const dateStr=d.date.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    div.innerHTML=`<div class="day-num">Day ${d.day}</div><div class="day-info"><div class="day-topic">${isToday?'⭐ ':''}${d.topic}</div><div class="day-focus">${d.focus}</div></div><div class="day-date">${dateStr}</div>`;
+    dl.appendChild(div);
+  });
+}
+
+function buildTopicList(){
+  const tl=document.getElementById('topics-list');
+  tl.innerHTML='';
+  TOPICS.forEach(unit=>{
+    const grp=document.createElement('div');
+    grp.className='topic-group';
+    grp.innerHTML=`<div class="group-title">${unit.unit}</div>`;
+    unit.items.forEach(t=>{
+      const status=topicStatus[t]||'none';
+      const row=document.createElement('div');
+      row.className='topic-row '+(status==='mastered'?'mastered':status==='review'?'review':'');
+      row.innerHTML=`<button class="check-btn ${status}" onclick="cycleStatus('${t}')">${status==='mastered'?'✓✓':status==='review'?'✓':''}</button><div class="topic-name">${t}</div><span class="paper-badge ${unit.paper}">${unit.paper==='p1'?'P1':unit.paper==='p2'?'P2':'P3'}</span>`;
+      grp.appendChild(row);
+    });
+    tl.appendChild(grp);
+  });
+  updateProgress();
+}
+
+function cycleStatus(t){
+  const cur=topicStatus[t]||'none';
+  topicStatus[t]=cur==='none'?'review':cur==='review'?'mastered':'none';
+  saveState();
+  buildTopicList();
+}
+
+function updateProgress(){
+  const all=[...TOPICS.flatMap(u=>u.items)];
+  const mastered=all.filter(t=>topicStatus[t]==='mastered').length;
+  document.getElementById('overall-pct').textContent=Math.round((mastered/all.length)*100)+'%';
+  const pl=document.getElementById('progress-list');
+  pl.innerHTML='';
+  TOPICS.forEach(unit=>{
+    const total=unit.items.length;
+    const m=unit.items.filter(t=>topicStatus[t]==='mastered').length;
+    const r=unit.items.filter(t=>topicStatus[t]==='review').length;
+    const pct=Math.round((m/total)*100);
+    const div=document.createElement('div');
+    div.className='prog-row';
+    div.innerHTML=`<div class="prog-row-header"><span class="plabel">${unit.unit}</span><span class="pcount">${m}/${total} mastered</span></div><div class="prog-bar2"><div class="prog-fill2 ${unit.paper}" style="width:${pct}%"></div></div><div class="prog-sub">${r} in review</div>`;
+    pl.appendChild(div);
+  });
+}
+
+// ── FLASHCARDS ──
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mode-'+m).classList.add('active');
+  showCard();
+}
+
+function loadCards(){
+  const f=document.getElementById('fc-filter').value;
+  if(f==='all') filtered=[...CARDS];
+  else if(['p1','p2','p3'].includes(f)) filtered=CARDS.filter(c=>c.paper===f);
+  else filtered=CARDS.filter(c=>c.topic===f);
+  idx=0;scoreGood=0;scoreHard=0;
+  document.getElementById('score-good').textContent=0;
+  document.getElementById('score-hard').textContent=0;
+  showCard();
+}
+
+function showCard(){
+  if(!filtered.length)return;
+  const card=filtered[idx];
+  document.getElementById('fc-tag').textContent=card.topic;
+  const pe=document.getElementById('fc-paper');
+  pe.textContent=card.paper==='p1'?'Paper 1':card.paper==='p2'?'Paper 2':'Paper 3';
+  pe.className='paper-badge '+card.paper;
+  document.getElementById('fc-q').textContent=card.q;
+  document.getElementById('fc-a').textContent=card.a;
+  document.getElementById('eval-pos').textContent=card.pos;
+  document.getElementById('eval-neg').textContent=card.neg;
+  document.getElementById('fc-counter').textContent=`${idx+1} / ${filtered.length}`;
+  document.getElementById('prog-fill').style.width=`${(idx/filtered.length)*100}%`;
+  const ae=document.getElementById('fc-a');
+  const ee=document.getElementById('eval-grid');
+  if(mode==='all'){ae.style.display='';ee.style.display='';}
+  else if(mode==='ao1'){ae.style.display='';ee.style.display='none';}
+  else{ae.style.display='none';ee.style.display='';}
+  document.getElementById('flashcard').classList.remove('revealed');
+  document.getElementById('action-row').style.display='none';
+  document.getElementById('reveal-hint').style.display='block';
+  revealed=false;
+}
+
+function revealCard(){
+  if(revealed)return;
+  revealed=true;
+  document.getElementById('flashcard').classList.add('revealed');
+  document.getElementById('action-row').style.display='grid';
+  document.getElementById('reveal-hint').style.display='none';
+}
+
+function nextCard(good){
+  if(good){scoreGood++;document.getElementById('score-good').textContent=scoreGood;}
+  else{scoreHard++;document.getElementById('score-hard').textContent=scoreHard;}
+  const card=filtered[idx];
+  const key=card.topic+'::'+card.q.substring(0,30);
+  if(!cardScores[key]) cardScores[key]={good:0,hard:0};
+  if(good) cardScores[key].good++; else cardScores[key].hard++;
+  saveState();
+  idx=(idx+1)%filtered.length;
+  document.getElementById('prog-fill').style.width=`${(idx/filtered.length)*100}%`;
+  showCard();
+}
+
+// ── TABS ──
+function showPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='progress') updateProgress();
+}
+
+init();
+</script>
+</body>
+</html>
