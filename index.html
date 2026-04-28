@@ -178,6 +178,8 @@
   .eval-box.pos .eval-lbl { color: var(--pos); }
   .eval-box.neg .eval-lbl { color: var(--neg); }
   .eval-txt { font-size: 12px; line-height: 1.55; }
+  .card-bullets { margin: 4px 0 4px 16px; padding: 0; }
+  .card-bullets li { margin-bottom: 3px; }
   .eval-box.pos .eval-txt { color: #2E5A0E; }
   .eval-box.neg .eval-txt { color: #7A1F1F; }
   .reveal-hint { text-align: center; font-size: 13px; color: var(--text2); padding: 8px; }
@@ -1288,6 +1290,36 @@ function setMode(m){
   showCard();
 }
 
+// Convert plain text with newlines and "- " bullets into safe HTML
+function formatCardText(text){
+  if(!text) return '';
+  // Escape HTML special chars first
+  const escaped = text
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+  // Split into lines, convert "- " prefixed lines to bullet list items
+  const lines = escaped.split('\n');
+  let html = '';
+  let inList = false;
+  lines.forEach(line => {
+    const isBullet = /^[-•]\s+/.test(line);
+    const content = isBullet ? line.replace(/^[-•]\s+/, '') : line;
+    if(isBullet){
+      if(!inList){ html += '<ul class="card-bullets">'; inList = true; }
+      html += `<li>${content}</li>`;
+    } else {
+      if(inList){ html += '</ul>'; inList = false; }
+      if(content === '') html += '<br>';
+      else html += `<span>${content}</span><br>`;
+    }
+  });
+  if(inList) html += '</ul>';
+  // Clean up trailing <br>
+  html = html.replace(/(<br>)+$/, '');
+  return html;
+}
+
 function loadCards(){
   const f = document.getElementById('fc-filter').value;
   const allCards = buildMergedCards();
@@ -1335,10 +1367,10 @@ function showCard(){
   }
   editedBadge.style.display = isEdited ? '' : 'none';
 
-  document.getElementById('fc-q').textContent=card.q;
-  document.getElementById('fc-a').textContent=card.a||'';
-  document.getElementById('eval-pos').textContent=card.pos||'';
-  document.getElementById('eval-neg').textContent=card.neg||'';
+  document.getElementById('fc-q').innerHTML=formatCardText(card.q);
+  document.getElementById('fc-a').innerHTML=formatCardText(card.a||'');
+  document.getElementById('eval-pos').innerHTML=formatCardText(card.pos||'');
+  document.getElementById('eval-neg').innerHTML=formatCardText(card.neg||'');
   document.getElementById('fc-counter').textContent=`${idx+1} / ${filtered.length}`;
   document.getElementById('prog-fill').style.width=`${(idx/filtered.length)*100}%`;
   const ae=document.getElementById('fc-a');
