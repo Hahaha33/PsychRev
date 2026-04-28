@@ -54,6 +54,26 @@
   .today-banner-topic { font-size:12px; opacity:.85; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .today-banner-badge { background:rgba(255,255,255,.22); border-radius:20px; padding:4px 10px; font-size:12px; font-weight:700; flex-shrink:0; }
 
+  /* ── EXAM DATE SETTINGS ── */
+  .exam-card { position:relative; cursor:pointer; transition:transform .15s,box-shadow .15s; }
+  .exam-card:active { transform:scale(.97); }
+  .exam-edit-hint { font-size:9px; opacity:.55; margin-top:3px; letter-spacing:.02em; }
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200; align-items:flex-end; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-sheet { background:var(--bg); border-radius:20px 20px 0 0; padding:24px 20px 36px; width:100%; max-width:480px; }
+  .modal-title { font-size:16px; font-weight:700; margin-bottom:4px; }
+  .modal-sub { font-size:13px; color:var(--text2); margin-bottom:20px; }
+  .modal-field { margin-bottom:16px; }
+  .modal-field label { display:block; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--text2); margin-bottom:6px; }
+  .modal-field input[type=date] { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:15px; box-sizing:border-box; }
+  .modal-actions { display:flex; gap:10px; margin-top:20px; }
+  .modal-btn { flex:1; padding:12px; border-radius:12px; border:none; font-size:15px; font-weight:600; cursor:pointer; }
+  .modal-btn.primary { background:#185FA5; color:#fff; }
+  .modal-btn.secondary { background:var(--bg2); color:var(--text); }
+  .regen-banner { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; font-size:13px; }
+  .regen-banner-icon { font-size:20px; flex-shrink:0; }
+  .regen-btn { margin-left:auto; flex-shrink:0; padding:6px 12px; background:#185FA5; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+
   /* ── PLAN ── */
   .exam-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
   .exam-card { border-radius: 12px; padding: 12px; text-align: center; }
@@ -171,6 +191,11 @@
   /* ── SYNC UI ── */
   .sync-bar { background: var(--bg2); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
   .sync-bar-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing:.05em; color: var(--text2); margin-bottom: 8px; }
+  .username-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .username-input { flex:1; font-size:14px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); }
+  .username-input::placeholder { color:var(--text2); }
+  .username-saved { font-size:12px; color:var(--text2); margin-left:2px; opacity:0; transition:opacity .3s; }
+  .username-saved.show { opacity:1; }
   .sync-code-row { display: flex; align-items: center; gap: 8px; }
   .sync-code { flex: 1; font-family: monospace; font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sync-action-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
@@ -278,10 +303,30 @@
 <!-- ═══════════ SCHEDULE PAGE ═══════════ -->
 <div class="page active" id="page-plan">
   <div id="today-banner"></div>
+  <div id="regen-banner" style="display:none" class="regen-banner">
+    <div class="regen-banner-icon">📅</div>
+    <div>Exam dates updated — regenerate your plan?</div>
+    <button class="regen-btn" onclick="regeneratePlan()">Regenerate</button>
+  </div>
   <div class="exam-cards">
-    <div class="exam-card p1"><div class="label">Paper 1</div><div class="date">15 May</div><div class="countdown" id="cd1"></div></div>
-    <div class="exam-card p2"><div class="label">Paper 2</div><div class="date">20 May</div><div class="countdown" id="cd2"></div></div>
-    <div class="exam-card p3"><div class="label">Paper 3</div><div class="date">5 June</div><div class="countdown" id="cd3"></div></div>
+    <div class="exam-card p1" onclick="openDateModal('p1')">
+      <div class="label">Paper 1</div>
+      <div class="date" id="ec-date-p1">15 May</div>
+      <div class="countdown" id="cd1"></div>
+      <div class="exam-edit-hint">tap to edit</div>
+    </div>
+    <div class="exam-card p2" onclick="openDateModal('p2')">
+      <div class="label">Paper 2</div>
+      <div class="date" id="ec-date-p2">20 May</div>
+      <div class="countdown" id="cd2"></div>
+      <div class="exam-edit-hint">tap to edit</div>
+    </div>
+    <div class="exam-card p3" onclick="openDateModal('p3')">
+      <div class="label">Paper 3</div>
+      <div class="date" id="ec-date-p3">5 Jun</div>
+      <div class="countdown" id="cd3"></div>
+      <div class="exam-edit-hint">tap to edit</div>
+    </div>
   </div>
   <div class="section-title">30-Day Plan</div>
   <div class="day-list" id="day-list"></div>
@@ -362,6 +407,10 @@
   <!-- Sync code card -->
   <div class="sync-bar">
     <div class="sync-bar-title">☁ Cloud Sync</div>
+    <div class="username-row">
+      <input class="username-input" id="username-input" type="text" maxlength="30" placeholder="Enter your name…" oninput="onUsernameInput()" onblur="saveUsername()">
+      <span class="username-saved" id="username-saved">Saved ✓</span>
+    </div>
     <div class="sync-code-row">
       <input class="sync-code" id="sync-code-display" readonly value="Loading…">
       <button class="sync-action-btn" onclick="copySyncCode()">Copy</button>
@@ -467,48 +516,143 @@
 // ══════════════════════════════════════════════════════
 const TODAY = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
 
-const PLAN = [
-  {day:1,paper:'p1',topic:'Social influence',focus:'Conformity types & explanations — Asch, NSI vs ISI',date:new Date(2026,3,26)},
-  {day:2,paper:'p1',topic:'Social influence',focus:'Obedience — Milgram, situational variables, agentic state',date:new Date(2026,3,27)},
-  {day:3,paper:'p1',topic:'Social influence',focus:'Resistance, minority influence & social change',date:new Date(2026,3,28)},
-  {day:4,paper:'p1',topic:'Memory',focus:'Multi-store model & working memory model',date:new Date(2026,3,29)},
-  {day:5,paper:'p1',topic:'Memory',focus:'Forgetting, interference, retrieval failure & EWT',date:new Date(2026,3,30)},
-  {day:6,paper:'p1',topic:'Memory',focus:'Cognitive interview & anxiety in EWT',date:new Date(2026,4,1)},
-  {day:7,paper:'p1',topic:'Attachment',focus:'Caregiver interactions & Schaffer\'s stages',date:new Date(2026,4,2)},
-  {day:8,paper:'p1',topic:'Attachment',focus:'Bowlby\'s theory, animal studies & learning theory',date:new Date(2026,4,3)},
-  {day:9,paper:'p1',topic:'Attachment',focus:'Strange Situation, types & cultural variations',date:new Date(2026,4,4)},
-  {day:10,paper:'p1',topic:'Attachment',focus:'Romanian orphan studies & influence of early attachment',date:new Date(2026,4,5)},
-  {day:11,paper:'p1',topic:'Psychopathology',focus:'Definitions of abnormality — all four with evaluation',date:new Date(2026,4,6)},
-  {day:12,paper:'p1',topic:'Psychopathology',focus:'Phobias & OCD — characteristics, explanations, treatments',date:new Date(2026,4,7)},
-  {day:13,paper:'p1',topic:'Psychopathology',focus:'Depression — characteristics, cognitive explanation & CBT',date:new Date(2026,4,8)},
-  {day:14,paper:'p1',topic:'Paper 1 revision',focus:'Social influence & Memory: mixed flashcards, past questions',date:new Date(2026,4,9)},
-  {day:15,paper:'p1',topic:'Paper 1 revision',focus:'Attachment & Psychopathology: timed 16-mark essays',date:new Date(2026,4,10)},
-  {day:16,paper:'p1',topic:'Paper 1 revision',focus:'Full Paper 1 mock — timed conditions, mark scheme review',date:new Date(2026,4,11)},
-  {day:17,paper:'p1',topic:'Paper 1 revision',focus:'Weak spots from mock — targeted re-study',date:new Date(2026,4,12)},
-  {day:18,paper:'p1',topic:'Paper 1 revision',focus:'Essay plans for all 4 topics — structure & evaluation',date:new Date(2026,4,13)},
-  {day:19,paper:'p1',topic:'Paper 1 revision',focus:'Light review — flashcards, key terms. Rest up.',date:new Date(2026,4,14)},
-  {day:20,paper:'p1',topic:'EXAM — Paper 1',focus:'Social Influence · Memory · Attachment · Psychopathology',date:new Date(2026,4,15),exam:true},
-  {day:21,paper:'p2',topic:'Approaches',focus:'Behaviourist approach & social learning theory',date:new Date(2026,4,16)},
-  {day:22,paper:'p2',topic:'Approaches',focus:'Cognitive, biological, psychodynamic & humanistic',date:new Date(2026,4,17)},
-  {day:23,paper:'p2',topic:'Biopsychology',focus:'Neurons, synaptic transmission, NS & endocrine systems',date:new Date(2026,4,18)},
-  {day:24,paper:'p2',topic:'Biopsychology',focus:'Localisation, lateralisation & split-brain research',date:new Date(2026,4,19)},
-  {day:25,paper:'p2',topic:'EXAM — Paper 2',focus:'Approaches · Biopsychology · Research Methods',date:new Date(2026,4,20),exam:true},
-  {day:26,paper:'p2',topic:'Research methods',focus:'Experiments, sampling, ethics & variables',date:new Date(2026,4,21)},
-  {day:27,paper:'p2',topic:'Research methods',focus:'Observations, self-report, correlations & inferential stats',date:new Date(2026,4,22)},
-  {day:28,paper:'p2',topic:'Research methods',focus:'Statistical tests, levels of measurement, reporting',date:new Date(2026,4,23)},
-  {day:29,paper:'p3',topic:'Relationships',focus:'Sexual selection, evolutionary explanations & attraction',date:new Date(2026,4,24)},
-  {day:30,paper:'p3',topic:'Relationships',focus:'Filter theory, self-disclosure, physical attractiveness',date:new Date(2026,4,25)},
-  {day:31,paper:'p3',topic:'Relationships',focus:'SET, equity theory & Rusbult\'s investment model',date:new Date(2026,4,26)},
-  {day:32,paper:'p3',topic:'Relationships',focus:'Duck\'s phase model, virtual & parasocial relationships',date:new Date(2026,4,27)},
-  {day:33,paper:'p3',topic:'Schizophrenia',focus:'Classification, positive & negative symptoms, issues in diagnosis',date:new Date(2026,4,28)},
-  {day:34,paper:'p3',topic:'Schizophrenia',focus:'Biological & psychological explanations',date:new Date(2026,4,29)},
-  {day:35,paper:'p3',topic:'Schizophrenia',focus:'Drug therapy, CBT, family therapy & interactionist model',date:new Date(2026,4,30)},
-  {day:36,paper:'p3',topic:'Forensic psychology',focus:'Offender profiling — top-down vs bottom-up',date:new Date(2026,5,1)},
-  {day:37,paper:'p3',topic:'Forensic psychology',focus:'Biological & psychological explanations of offending',date:new Date(2026,5,2)},
-  {day:38,paper:'p3',topic:'Forensic psychology',focus:'Custodial sentencing, treatment programmes & recidivism',date:new Date(2026,5,3)},
-  {day:39,paper:'p3',topic:'Issues and debates',focus:'Gender bias, culture bias — alpha/beta bias, ethnocentrism',date:new Date(2026,5,4)},
-  {day:40,paper:'p3',topic:'EXAM — Paper 3',focus:'Issues & Debates · Forensic · Schizophrenia · Relationships',date:new Date(2026,5,5),exam:true},
-];
+// ── EXAM DATES (loaded from localStorage or defaults) ──
+const DEFAULT_EXAM_DATES = {
+  p1: '2026-05-15',
+  p2: '2026-05-20',
+  p3: '2026-06-05'
+};
+
+function loadExamDates() {
+  try {
+    const saved = localStorage.getItem('examDates');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return { ...DEFAULT_EXAM_DATES };
+}
+
+function saveExamDates(dates) {
+  try { localStorage.setItem('examDates', JSON.stringify(dates)); } catch(e) {}
+}
+
+function parseDate(str) {
+  const [y,m,d] = str.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+
+// ── PLAN TEMPLATE (topic/focus sequences per paper, no dates) ──
+const PLAN_TEMPLATE = {
+  p1: [
+    {topic:'Social influence',focus:'Conformity types & explanations — Asch, NSI vs ISI'},
+    {topic:'Social influence',focus:'Obedience — Milgram, situational variables, agentic state'},
+    {topic:'Social influence',focus:'Resistance, minority influence & social change'},
+    {topic:'Memory',focus:'Multi-store model & working memory model'},
+    {topic:'Memory',focus:'Forgetting, interference, retrieval failure & EWT'},
+    {topic:'Memory',focus:'Cognitive interview & anxiety in EWT'},
+    {topic:'Attachment',focus:'Caregiver interactions & Schaffer\'s stages'},
+    {topic:'Attachment',focus:'Bowlby\'s theory, animal studies & learning theory'},
+    {topic:'Attachment',focus:'Strange Situation, types & cultural variations'},
+    {topic:'Attachment',focus:'Romanian orphan studies & influence of early attachment'},
+    {topic:'Psychopathology',focus:'Definitions of abnormality — all four with evaluation'},
+    {topic:'Psychopathology',focus:'Phobias & OCD — characteristics, explanations, treatments'},
+    {topic:'Psychopathology',focus:'Depression — characteristics, cognitive explanation & CBT'},
+    {topic:'Paper 1 revision',focus:'Social influence & Memory: mixed flashcards, past questions'},
+    {topic:'Paper 1 revision',focus:'Attachment & Psychopathology: timed 16-mark essays'},
+    {topic:'Paper 1 revision',focus:'Full Paper 1 mock — timed conditions, mark scheme review'},
+    {topic:'Paper 1 revision',focus:'Weak spots from mock — targeted re-study'},
+    {topic:'Paper 1 revision',focus:'Essay plans for all 4 topics — structure & evaluation'},
+    {topic:'Paper 1 revision',focus:'Light review — flashcards, key terms. Rest up.'},
+    {topic:'EXAM — Paper 1',focus:'Social Influence · Memory · Attachment · Psychopathology',exam:true},
+  ],
+  p2: [
+    {topic:'Approaches',focus:'Behaviourist approach & social learning theory'},
+    {topic:'Approaches',focus:'Cognitive, biological, psychodynamic & humanistic'},
+    {topic:'Biopsychology',focus:'Neurons, synaptic transmission, NS & endocrine systems'},
+    {topic:'Biopsychology',focus:'Localisation, lateralisation & split-brain research'},
+    {topic:'EXAM — Paper 2',focus:'Approaches · Biopsychology · Research Methods',exam:true},
+    {topic:'Research methods',focus:'Experiments, sampling, ethics & variables'},
+    {topic:'Research methods',focus:'Observations, self-report, correlations & inferential stats'},
+    {topic:'Research methods',focus:'Statistical tests, levels of measurement, reporting'},
+  ],
+  p3: [
+    {topic:'Relationships',focus:'Sexual selection, evolutionary explanations & attraction'},
+    {topic:'Relationships',focus:'Filter theory, self-disclosure, physical attractiveness'},
+    {topic:'Relationships',focus:'SET, equity theory & Rusbult\'s investment model'},
+    {topic:'Relationships',focus:'Duck\'s phase model, virtual & parasocial relationships'},
+    {topic:'Schizophrenia',focus:'Classification, positive & negative symptoms, issues in diagnosis'},
+    {topic:'Schizophrenia',focus:'Biological & psychological explanations'},
+    {topic:'Schizophrenia',focus:'Drug therapy, CBT, family therapy & interactionist model'},
+    {topic:'Forensic psychology',focus:'Offender profiling — top-down vs bottom-up'},
+    {topic:'Forensic psychology',focus:'Biological & psychological explanations of offending'},
+    {topic:'Forensic psychology',focus:'Custodial sentencing, treatment programmes & recidivism'},
+    {topic:'Issues and debates',focus:'Gender bias, culture bias — alpha/beta bias, ethnocentrism'},
+    {topic:'EXAM — Paper 3',focus:'Issues & Debates · Forensic · Schizophrenia · Relationships',exam:true},
+  ]
+};
+
+// ── PLAN GENERATOR ──
+function generatePlan(examDates) {
+  const plan = [];
+  const papers = ['p1','p2','p3'];
+
+  // Sort papers by exam date
+  const sorted = papers.slice().sort((a,b) => parseDate(examDates[a]) - parseDate(examDates[b]));
+
+  // For each paper, distribute its template items evenly across days before the exam
+  // P1 starts from today (or 14 days before P1 exam if far away)
+  // Each subsequent paper starts the day after previous exam
+
+  let cursor = new Date(TODAY); // start from today
+
+  sorted.forEach(paper => {
+    const examDate = parseDate(examDates[paper]);
+    const template = PLAN_TEMPLATE[paper];
+    const nonExamItems = template.filter(t => !t.exam);
+    const examItem = template.find(t => t.exam);
+
+    // Days available before exam (from cursor to day before exam)
+    const daysAvail = Math.max(1, Math.floor((examDate - cursor) / 86400000));
+    const itemCount = nonExamItems.length;
+
+    if (daysAvail >= itemCount) {
+      // Enough days — spread items out with rest days if lots of space
+      const step = daysAvail / itemCount;
+      nonExamItems.forEach((item, i) => {
+        const d = new Date(cursor);
+        d.setDate(d.getDate() + Math.round(i * step));
+        plan.push({ ...item, paper, date: d });
+      });
+    } else {
+      // Tight schedule — stack items on consecutive days, skip what won't fit
+      const toShow = nonExamItems.slice(-daysAvail); // keep the most important (end) items
+      toShow.forEach((item, i) => {
+        const d = new Date(cursor);
+        d.setDate(d.getDate() + i);
+        plan.push({ ...item, paper, date: d });
+      });
+    }
+
+    // Add exam day
+    if (examItem) {
+      plan.push({ ...examItem, paper, date: examDate });
+    }
+
+    // Next paper starts day after exam
+    cursor = new Date(examDate);
+    cursor.setDate(cursor.getDate() + 1);
+  });
+
+  // Number the days and sort by date
+  plan.sort((a,b) => a.date - b.date);
+  plan.forEach((item, i) => { item.day = i + 1; });
+
+  return plan;
+}
+
+let examDates = loadExamDates();
+let PLAN = generatePlan(examDates);
 
 const TOPICS = [
   {unit:'Paper 1',paper:'p1',items:['Social influence','Memory','Attachment','Psychopathology']},
@@ -601,8 +745,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ── SYNC ID ──
-const SYNC_ID_KEY = 'aqa_sync_id';
-const STORE_KEY   = 'aqa_psych_v1';
+const SYNC_ID_KEY  = 'aqa_sync_id';
+const STORE_KEY    = 'aqa_psych_v1';
+const USERNAME_KEY = 'aqa_username';
 
 function getSyncId(){
   let id = localStorage.getItem(SYNC_ID_KEY);
@@ -642,7 +787,8 @@ function updateSyncCodeUI(){
 }
 
 async function saveState(){
-  const state={topicStatus,cardScores,lastSaved:new Date().toISOString()};
+  const username = (document.getElementById('username-input')||{}).value||localStorage.getItem(USERNAME_KEY)||'';
+  const state={topicStatus,cardScores,lastSaved:new Date().toISOString(),username};
   try{ localStorage.setItem(STORE_KEY,JSON.stringify(state)); }catch(e){}
   updateLastSavedUI(state.lastSaved);
   setSyncStatus('syncing');
@@ -660,6 +806,11 @@ function applyState(state){
   if(state.topicStatus) topicStatus=state.topicStatus;
   if(state.cardScores)  cardScores =state.cardScores;
   if(state.lastSaved)   updateLastSavedUI(state.lastSaved);
+  if(state.username){
+    try{ localStorage.setItem(USERNAME_KEY, state.username); }catch(e){}
+    const el=document.getElementById('username-input');
+    if(el) el.value=state.username;
+  }
 }
 
 function loadFromLocalStorage(){
@@ -730,6 +881,36 @@ function resetState(){
   buildTopicList(); updateProgress(); loadCards();
 }
 
+let _usernameTimer=null;
+function onUsernameInput(){
+  // debounce — save after user stops typing for 1.5s
+  clearTimeout(_usernameTimer);
+  _usernameTimer=setTimeout(saveUsername, 1500);
+}
+
+function saveUsername(){
+  clearTimeout(_usernameTimer);
+  const el=document.getElementById('username-input');
+  if(!el) return;
+  const name=el.value.trim();
+  try{ localStorage.setItem(USERNAME_KEY, name); }catch(e){}
+  // persist to Firebase immediately
+  saveState();
+  // show "Saved ✓" flash
+  const badge=document.getElementById('username-saved');
+  if(badge){
+    badge.classList.add('show');
+    setTimeout(()=>badge.classList.remove('show'), 2000);
+  }
+}
+
+function loadUsernameUI(){
+  const el=document.getElementById('username-input');
+  if(!el) return;
+  const saved=localStorage.getItem(USERNAME_KEY);
+  if(saved) el.value=saved;
+}
+
 let _toastTimer=null;
 function showSaveToast(){
   const t=document.getElementById('save-toast');
@@ -749,6 +930,7 @@ async function init(){
   buildTodayBanner();
   buildCountdowns();
   buildDayList();
+  loadUsernameUI();
   await loadState();
   buildTopicList();
   loadCards();
@@ -790,11 +972,49 @@ function daysUntil(d){
 }
 
 function buildCountdowns(){
-  const dates=[[new Date(2026,4,15),'cd1'],[new Date(2026,4,20),'cd2'],[new Date(2026,5,5),'cd3']];
-  dates.forEach(([d,id])=>{
+  const pairs=[['p1','cd1'],['p2','cd2'],['p3','cd3']];
+  pairs.forEach(([paper,id])=>{
+    const d=parseDate(examDates[paper]);
     const n=daysUntil(d);
     document.getElementById(id).textContent=n>0?n+' days':n===0?'Today!':'Done';
+    // update card date label
+    const el=document.getElementById('ec-date-'+paper);
+    if(el) el.textContent=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
   });
+}
+
+// ── EXAM DATE MODAL ──
+let _modalPaper=null;
+function openDateModal(paper){
+  _modalPaper=paper;
+  const labels={p1:'Paper 1',p2:'Paper 2',p3:'Paper 3'};
+  document.getElementById('modal-title').textContent='Edit '+labels[paper]+' Exam Date';
+  document.getElementById('modal-date-input').value=examDates[paper];
+  document.getElementById('date-modal').classList.add('open');
+}
+function closeDateModal(e){
+  if(e && e.target!==document.getElementById('date-modal')) return;
+  document.getElementById('date-modal').classList.remove('open');
+  _modalPaper=null;
+}
+function saveDateModal(){
+  const val=document.getElementById('modal-date-input').value;
+  if(!val||!_modalPaper) return;
+  examDates[_modalPaper]=val;
+  saveExamDates(examDates);
+  document.getElementById('date-modal').classList.remove('open');
+  // regenerate immediately
+  regeneratePlan();
+}
+function regeneratePlan(){
+  PLAN=generatePlan(examDates);
+  buildCountdowns();
+  buildTodayBanner();
+  const dl=document.getElementById('day-list');
+  dl.innerHTML='';
+  buildDayList();
+  document.getElementById('regen-banner').style.display='none';
+  showSaveToast();
 }
 
 function buildDayList(){
@@ -931,5 +1151,21 @@ function showPage(name,btn){
 
 init();
 </script>
+<!-- ═══════════ EXAM DATE MODAL ═══════════ -->
+<div class="modal-overlay" id="date-modal" onclick="closeDateModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-title" id="modal-title">Edit Exam Date</div>
+    <div class="modal-sub" id="modal-sub">Set the date for this paper. Your revision plan will update to fit.</div>
+    <div class="modal-field">
+      <label>Exam Date</label>
+      <input type="date" id="modal-date-input" />
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" onclick="closeDateModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="saveDateModal()">Save & Regenerate</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
