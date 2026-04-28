@@ -194,6 +194,16 @@
   .act-btn:active { transform: scale(0.97); }
   .act-btn.good { border-color: var(--pos-border); color: var(--pos); background: var(--pos-bg); }
   .act-btn.hard { border-color: var(--neg-border); color: var(--neg); background: var(--neg-bg); }
+  .fc-shuffle-btn { flex-shrink:0; padding:7px 11px; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--text2); font-size:15px; cursor:pointer; transition:background .15s,color .15s; }
+  .fc-shuffle-btn.active { background:var(--text); color:var(--bg); }
+  .tricky-banner { background:var(--neg-bg); border:1px solid var(--neg-border); border-radius:10px; padding:9px 13px; margin-bottom:10px; display:none; align-items:center; gap:8px; font-size:13px; color:var(--neg); font-weight:600; }
+  .tricky-banner.show { display:flex; }
+  .tricky-banner-count { margin-left:auto; font-size:12px; opacity:.8; font-weight:500; }
+  .deck-done-banner { background:var(--pos-bg); border:1px solid var(--pos-border); border-radius:12px; padding:16px; margin-bottom:12px; display:none; flex-direction:column; align-items:center; gap:8px; text-align:center; }
+  .deck-done-banner.show { display:flex; }
+  .deck-done-title { font-size:16px; font-weight:700; color:var(--pos); }
+  .deck-done-sub { font-size:13px; color:var(--text2); }
+  .deck-done-btn { margin-top:4px; padding:9px 20px; border-radius:10px; border:1px solid var(--neg-border); font-size:13px; font-weight:600; cursor:pointer; background:var(--neg-bg); color:var(--neg); }
 
   /* ── PROGRESS ── */
   .prog-section { margin-bottom: 20px; }
@@ -372,27 +382,20 @@
 <div class="page" id="page-flashcards">
   <div class="fc-controls">
     <select class="fc-select" id="fc-filter" onchange="loadCards()">
-      <option value="all">All topics (67 cards)</option>
-      <option value="p1">── Paper 1</option>
-      <option value="Social influence">Social influence</option>
-      <option value="Memory">Memory</option>
-      <option value="Attachment">Attachment</option>
-      <option value="Psychopathology">Psychopathology</option>
-      <option value="p2">── Paper 2</option>
-      <option value="Approaches">Approaches</option>
-      <option value="Biopsychology">Biopsychology</option>
-      <option value="Research methods">Research methods</option>
-      <option value="p3">── Paper 3</option>
-      <option value="Relationships">Relationships</option>
-      <option value="Schizophrenia">Schizophrenia</option>
-      <option value="Forensic psychology">Forensic psychology</option>
-      <option value="Issues and debates">Issues and debates</option>
+      <option value="all">All topics</option>
     </select>
+    <button class="fc-shuffle-btn" id="shuffle-btn" onclick="toggleShuffle()" title="Shuffle cards">🔀</button>
     <div class="mode-group">
       <button class="mode-btn active" id="mode-all" onclick="setMode('all')">Full</button>
       <button class="mode-btn" id="mode-ao1" onclick="setMode('ao1')">AO1</button>
       <button class="mode-btn" id="mode-ao3" onclick="setMode('ao3')">AO3</button>
     </div>
+  </div>
+  <div class="tricky-banner" id="tricky-banner">🔁 Reviewing tricky cards<span class="tricky-banner-count" id="tricky-banner-count"></span></div>
+  <div class="deck-done-banner" id="deck-done-banner">
+    <div class="deck-done-title" id="deck-done-title">✓ Deck complete!</div>
+    <div class="deck-done-sub" id="deck-done-sub"></div>
+    <button class="deck-done-btn" id="deck-done-btn" onclick="startTrickyRound()" style="display:none">🔁 Review tricky cards</button>
   </div>
   <div class="fc-status">
     <span class="fc-counter" id="fc-counter">1 / 67</span>
@@ -992,6 +995,7 @@ function rebuildAllCards(){
 function updateFilterDropdown(allCards){
   const sel = document.getElementById('fc-filter');
   if(!sel) return;
+  const currentVal = sel.value; // preserve current selection
   // Get all unique topics including custom
   const topics = [...new Set(allCards.map(c => c.topic))];
   const papers = { p1:[], p2:[], p3:[] };
@@ -1000,15 +1004,29 @@ function updateFilterDropdown(allCards){
     if(card) (papers[card.paper] || papers.p1).push(t);
   });
   const total = allCards.length;
+  const p1count = allCards.filter(c=>c.paper==='p1').length;
+  const p2count = allCards.filter(c=>c.paper==='p2').length;
+  const p3count = allCards.filter(c=>c.paper==='p3').length;
   sel.innerHTML = `<option value="all">All topics (${total} cards)</option>`;
-  const paperLabels = { p1:'── Paper 1', p2:'── Paper 2', p3:'── Paper 3' };
-  ['p1','p2','p3'].forEach(p => {
-    sel.innerHTML += `<option value="${p}" disabled>${paperLabels[p]}</option>`;
-    (papers[p]||[]).forEach(t => {
-      const isCustom = customCards.some(c => c.topic === t);
-      sel.innerHTML += `<option value="${t}">${t}${isCustom?' ✦':''}</option>`;
-    });
+  // Paper-level selectable options
+  sel.innerHTML += `<option value="p1">📄 Paper 1 (${p1count} cards)</option>`;
+  (papers.p1||[]).forEach(t => {
+    const isCustom = customCards.some(c => c.topic === t);
+    sel.innerHTML += `<option value="${t}">&nbsp;&nbsp;&nbsp;${t}${isCustom?' ✦':''}</option>`;
   });
+  sel.innerHTML += `<option value="p2">📄 Paper 2 (${p2count} cards)</option>`;
+  (papers.p2||[]).forEach(t => {
+    const isCustom = customCards.some(c => c.topic === t);
+    sel.innerHTML += `<option value="${t}">&nbsp;&nbsp;&nbsp;${t}${isCustom?' ✦':''}</option>`;
+  });
+  sel.innerHTML += `<option value="p3">📄 Paper 3 (${p3count} cards)</option>`;
+  (papers.p3||[]).forEach(t => {
+    const isCustom = customCards.some(c => c.topic === t);
+    sel.innerHTML += `<option value="${t}">&nbsp;&nbsp;&nbsp;${t}${isCustom?' ✦':''}</option>`;
+  });
+  // Restore selection if still valid
+  const vals = [...sel.options].map(o => o.value);
+  sel.value = vals.includes(currentVal) ? currentVal : 'all';
 }
 
 // ── CARD EDITOR STATE ──
@@ -1118,6 +1136,9 @@ function saveCardEditor(){
 
   if(!q){ alert('Please enter a question.'); return; }
 
+  // Remember which card we're on so we can return to it after rebuild
+  const currentCardId = filtered[idx] ? filtered[idx]._id : null;
+
   if(_editorCardId === null){
     // New custom card
     const newCard = { topic, paper, q, a, pos, neg, _custom: true };
@@ -1135,6 +1156,8 @@ function saveCardEditor(){
   }
 
   closeCardEditor();
+  // Rebuild cards then restore position
+  _pendingRestoreCardId = currentCardId;
   rebuildAllCards();
   saveState();
 }
@@ -1157,6 +1180,10 @@ function deleteCard(){
 
 let filtered=[...CARDS];
 let idx=0,revealed=false,scoreGood=0,scoreHard=0,mode='all';
+let isShuffled=false;           // shuffle toggle state (resets on loadCards)
+let trickyQueue=[];             // cards marked tricky this session
+let inTrickyRound=false;       // whether we're in the tricky review pass
+let _pendingRestoreCardId=null; // card to scroll back to after editor save
 
 // ── INIT ──
 async function init(){
@@ -1446,13 +1473,75 @@ function loadCards(){
   if(f==='all') filtered=[...allCards];
   else if(['p1','p2','p3'].includes(f)) filtered=allCards.filter(c=>c.paper===f);
   else filtered=allCards.filter(c=>c.topic===f);
-  idx=0;scoreGood=0;scoreHard=0;
-  document.getElementById('score-good').textContent=0;
-  document.getElementById('score-hard').textContent=0;
+
+  // If we have a card to restore to (e.g. after editing), jump to it
+  if(_pendingRestoreCardId !== null){
+    const restoreIdx = filtered.findIndex(c => c._id === _pendingRestoreCardId);
+    idx = restoreIdx >= 0 ? restoreIdx : 0;
+    _pendingRestoreCardId = null;
+    // Don't reset scores or shuffle when just restoring after an edit
+  } else {
+    idx=0;scoreGood=0;scoreHard=0;
+    isShuffled=false;
+    trickyQueue=[];
+    inTrickyRound=false;
+    document.getElementById('score-good').textContent=0;
+    document.getElementById('score-hard').textContent=0;
+    document.getElementById('shuffle-btn').classList.remove('active');
+    hideDeckBanners();
+  }
   showCard();
 }
 
-function showCard(){
+function hideDeckBanners(){
+  document.getElementById('tricky-banner').classList.remove('show');
+  document.getElementById('deck-done-banner').classList.remove('show');
+}
+
+function toggleShuffle(){
+  isShuffled = !isShuffled;
+  const btn = document.getElementById('shuffle-btn');
+  btn.classList.toggle('active', isShuffled);
+  if(isShuffled){
+    // Fisher-Yates shuffle of a copy, preserving the current card at position 0
+    const current = filtered[idx];
+    const rest = filtered.filter((_,i) => i !== idx);
+    for(let i=rest.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [rest[i],rest[j]]=[rest[j],rest[i]];
+    }
+    filtered = [current, ...rest];
+    idx = 0;
+  } else {
+    // Restore original order from rebuilt cards
+    const f = document.getElementById('fc-filter').value;
+    const allCards = buildMergedCards();
+    let restored;
+    if(f==='all') restored=[...allCards];
+    else if(['p1','p2','p3'].includes(f)) restored=allCards.filter(c=>c.paper===f);
+    else restored=allCards.filter(c=>c.topic===f);
+    // Preserve current card position
+    const currentId = filtered[idx]?._id;
+    filtered = restored;
+    idx = filtered.findIndex(c=>c._id===currentId);
+    if(idx<0) idx=0;
+  }
+  showCard();
+}
+
+function startTrickyRound(){
+  if(!trickyQueue.length) return;
+  filtered = [...trickyQueue];
+  trickyQueue = [];
+  inTrickyRound = true;
+  idx = 0;
+  hideDeckBanners();
+  document.getElementById('tricky-banner').classList.add('show');
+  document.getElementById('tricky-banner-count').textContent = `— ${filtered.length} card${filtered.length===1?'':'s'}`;
+  showCard();
+}
+
+
   if(!filtered.length){
     document.getElementById('fc-q').textContent='No cards in this filter.';
     document.getElementById('fc-tag').textContent='';
@@ -1518,9 +1607,50 @@ function nextCard(good){
   const card=filtered[idx];
   const key=card.topic+'::'+card.q.substring(0,30);
   if(!cardScores[key]) cardScores[key]={good:0,hard:0};
-  if(good) cardScores[key].good++; else cardScores[key].hard++;
+  if(good) cardScores[key].good++; else{
+    cardScores[key].hard++;
+    // Add to tricky queue if not already in it (prevent infinite loops)
+    if(!inTrickyRound) trickyQueue.push(card);
+  }
   saveState();
-  idx=(idx+1)%filtered.length;
+
+  const nextIdx = idx + 1;
+  if(nextIdx >= filtered.length){
+    // Reached end of deck — show completion banner
+    const hadTricky = !inTrickyRound && trickyQueue.length > 0;
+    const doneTitle = document.getElementById('deck-done-title');
+    const doneSub   = document.getElementById('deck-done-sub');
+    const doneBtn   = document.getElementById('deck-done-btn');
+    if(inTrickyRound && trickyQueue.length === 0){
+      // Completed tricky round cleanly
+      doneTitle.textContent = '🎉 All clear!';
+      doneSub.textContent = `No tricky cards left — great work! (✓ ${scoreGood}  ✗ ${scoreHard} this session)`;
+      doneBtn.style.display = 'none';
+      document.getElementById('tricky-banner').classList.remove('show');
+    } else if(inTrickyRound && trickyQueue.length > 0){
+      // Still tricky cards after the round
+      doneTitle.textContent = '🔁 Round complete';
+      doneSub.textContent = `${trickyQueue.length} still tricky — keep going?`;
+      doneBtn.style.display = '';
+      doneBtn.textContent = `🔁 Review ${trickyQueue.length} tricky card${trickyQueue.length===1?'':'s'} again`;
+    } else if(hadTricky){
+      doneTitle.textContent = '✓ Deck complete!';
+      doneSub.textContent = `✓ ${scoreGood} got it  ·  ✗ ${scoreHard} tricky`;
+      doneBtn.style.display = '';
+      doneBtn.textContent = `🔁 Review ${trickyQueue.length} tricky card${trickyQueue.length===1?'':'s'}`;
+    } else {
+      doneTitle.textContent = '🎉 Perfect round!';
+      doneSub.textContent = `All ${scoreGood} card${scoreGood===1?'':'s'} correct — excellent!`;
+      doneBtn.style.display = 'none';
+    }
+    document.getElementById('deck-done-banner').classList.add('show');
+    document.getElementById('flashcard').classList.remove('revealed');
+    document.getElementById('action-row').style.display='none';
+    document.getElementById('reveal-hint').style.display='none';
+    return;
+  }
+
+  idx = nextIdx;
   document.getElementById('prog-fill').style.width=`${(idx/filtered.length)*100}%`;
   showCard();
 }
