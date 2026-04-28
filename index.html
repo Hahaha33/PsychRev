@@ -180,6 +180,11 @@
   .eval-txt { font-size: 12px; line-height: 1.55; }
   .card-bullets { margin: 4px 0 4px 16px; padding: 0; }
   .card-bullets li { margin-bottom: 3px; }
+  .card-indent { display:block; padding-left: 1.4em; }
+  .indent-toolbar { display:none; position:absolute; z-index:400; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:5px 8px; gap:6px; align-items:center; box-shadow:0 2px 12px rgba(0,0,0,.18); flex-wrap:wrap; }
+  .indent-toolbar-label { font-size:11px; color:var(--text2); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .indent-btn { background:var(--bg); border:1px solid var(--border); border-radius:7px; padding:5px 10px; font-size:12px; font-weight:600; cursor:pointer; color:var(--text); white-space:nowrap; }
+  .indent-btn:active { background:var(--text); color:var(--bg); }
   .eval-box.pos .eval-txt { color: #2E5A0E; }
   .eval-box.neg .eval-txt { color: #7A1F1F; }
   .reveal-hint { text-align: center; font-size: 13px; color: var(--text2); padding: 8px; }
@@ -1065,6 +1070,28 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('editor-custom-topic-field').style.display =
       topicSel.value === 'Custom' ? '' : 'none';
   });
+
+  // ── TAB INDENTATION IN TEXTAREAS ──
+  const editorTextareas = ['editor-q','editor-a','editor-pos','editor-neg'];
+  editorTextareas.forEach(id => {
+    const ta = document.getElementById(id);
+    if(!ta) return;
+
+    // Desktop: intercept Tab key
+    ta.addEventListener('keydown', e => {
+      if(e.key === 'Tab'){
+        e.preventDefault();
+        insertAtCursor(ta, '    '); // 4 spaces
+      }
+    });
+
+    // Mobile: show/hide indent toolbar on focus/blur
+    ta.addEventListener('focus', () => showIndentToolbar(ta));
+    ta.addEventListener('blur',  () => {
+      // Small delay so toolbar button taps register before hide
+      setTimeout(hideIndentToolbar, 200);
+    });
+  });
 });
 
 function getEditorTopic(){
@@ -1290,32 +1317,100 @@ function setMode(m){
   showCard();
 }
 
-// Convert plain text with newlines and "- " bullets into safe HTML
+// ── INDENT HELPERS ──
+function insertAtCursor(ta, text){
+  const start = ta.selectionStart;
+  const end   = ta.selectionEnd;
+  if(start !== end){
+    const before = ta.value.substring(0, start);
+    const selected = ta.value.substring(start, end);
+    const after = ta.value.substring(end);
+    const indented = selected.split('\n').map(l => text + l).join('\n');
+    ta.value = before + indented + after;
+    ta.selectionStart = start;
+    ta.selectionEnd   = start + indented.length;
+  } else {
+    ta.value = ta.value.substring(0, start) + text + ta.value.substring(end);
+    ta.selectionStart = ta.selectionEnd = start + text.length;
+  }
+  ta.dispatchEvent(new Event('input'));
+}
+
+function removeIndentAtCursor(ta){
+  const start = ta.selectionStart;
+  const before = ta.value.substring(0, start);
+  const linesBefore = before.split('\n');
+  const lineStart = before.length - linesBefore[linesBefore.length-1].length;
+  const line = ta.value.substring(lineStart);
+  const stripped = line.replace(/^ {1,4}/, '');
+  const removed = line.length - stripped.length;
+  if(removed === 0) return;
+  ta.value = ta.value.substring(0, lineStart) + stripped;
+  ta.selectionStart = ta.selectionEnd = Math.max(lineStart, start - removed);
+  ta.dispatchEvent(new Event('input'));
+}
+
+let _indentToolbarTarget = null;
+
+function showIndentToolbar(ta){
+  _indentToolbarTarget = ta;
+  let toolbar = document.getElementById('indent-toolbar');
+  if(!toolbar){
+    toolbar = document.createElement('div');
+    toolbar.id = 'indent-toolbar';
+    toolbar.className = 'indent-toolbar';
+    toolbar.innerHTML = `
+      <span class="indent-toolbar-label">Insert:</span>
+      <button class="indent-btn" onmousedown="event.preventDefault();insertAtCursor(_indentToolbarTarget,'    ')">⇥ Indent</button>
+      <button class="indent-btn" onmousedown="event.preventDefault();removeIndentAtCursor(_indentToolbarTarget)">⇤ Unindent</button>
+      <button class="indent-btn" onmousedown="event.preventDefault();insertAtCursor(_indentToolbarTarget,'- ')">• Bullet</button>
+      <button class="indent-btn" onmousedown="event.preventDefault();insertAtCursor(_indentToolbarTarget,'\n')">↵ New line</button>
+    `;
+    document.body.appendChild(toolbar);
+  }
+  toolbar.style.display = 'flex';
+  requestAnimationFrame(() => {
+    const r = ta.getBoundingClientRect();
+    toolbar.style.top  = (r.top + window.scrollY - toolbar.offsetHeight - 6) + 'px';
+    toolbar.style.left = r.left + 'px';
+    toolbar.style.width = r.width + 'px';
+  });
+}
+
+function hideIndentToolbar(){
+  const toolbar = document.getElementById('indent-toolbar');
+  if(toolbar) toolbar.style.display = 'none';
+  _indentToolbarTarget = null;
+}
+
+// Convert plain text with newlines, "- " bullets, and indentation into safe HTML
 function formatCardText(text){
   if(!text) return '';
-  // Escape HTML special chars first
   const escaped = text
     .replace(/&/g,'&amp;')
     .replace(/</g,'&lt;')
     .replace(/>/g,'&gt;');
-  // Split into lines, convert "- " prefixed lines to bullet list items
   const lines = escaped.split('\n');
   let html = '';
   let inList = false;
   lines.forEach(line => {
     const isBullet = /^[-•]\s+/.test(line);
-    const content = isBullet ? line.replace(/^[-•]\s+/, '') : line;
+    const isIndented = !isBullet && /^ {2,}/.test(line);
+    const content = isBullet
+      ? line.replace(/^[-•]\s+/, '')
+      : isIndented ? line.trimStart()
+      : line;
     if(isBullet){
       if(!inList){ html += '<ul class="card-bullets">'; inList = true; }
       html += `<li>${content}</li>`;
     } else {
       if(inList){ html += '</ul>'; inList = false; }
       if(content === '') html += '<br>';
+      else if(isIndented) html += `<span class="card-indent">${content}</span>`;
       else html += `<span>${content}</span><br>`;
     }
   });
   if(inList) html += '</ul>';
-  // Clean up trailing <br>
   html = html.replace(/(<br>)+$/, '');
   return html;
 }
