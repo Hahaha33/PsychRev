@@ -1605,8 +1605,8 @@ function nextCard(good){
   if(!cardScores[key]) cardScores[key]={good:0,hard:0};
   if(good) cardScores[key].good++; else{
     cardScores[key].hard++;
-    // Add to tricky queue if not already in it (prevent infinite loops)
-    if(!inTrickyRound) trickyQueue.push(card);
+    // Always queue tricky cards — even during a tricky round — for the next pass
+    trickyQueue.push(card);
   }
   saveState();
 
@@ -1618,15 +1618,16 @@ function nextCard(good){
     const doneSub   = document.getElementById('deck-done-sub');
     const doneBtn   = document.getElementById('deck-done-btn');
     if(inTrickyRound && trickyQueue.length === 0){
-      // Completed tricky round cleanly
+      // Cleared every card in the tricky round
       doneTitle.textContent = '🎉 All clear!';
-      doneSub.textContent = `No tricky cards left — great work! (✓ ${scoreGood}  ✗ ${scoreHard} this session)`;
+      doneSub.textContent = `✓ ${scoreGood} got it — no tricky cards left! Great work.`;
       doneBtn.style.display = 'none';
       document.getElementById('tricky-banner').classList.remove('show');
     } else if(inTrickyRound && trickyQueue.length > 0){
-      // Still tricky cards after the round
+      // Some cards still tricky after the round
+      const clearedCount = filtered.length - trickyQueue.length;
       doneTitle.textContent = '🔁 Round complete';
-      doneSub.textContent = `${trickyQueue.length} still tricky — keep going?`;
+      doneSub.textContent = `✓ ${clearedCount} got it  ·  ✗ ${trickyQueue.length} still tricky`;
       doneBtn.style.display = '';
       doneBtn.textContent = `🔁 Review ${trickyQueue.length} tricky card${trickyQueue.length===1?'':'s'} again`;
     } else if(hadTricky){
