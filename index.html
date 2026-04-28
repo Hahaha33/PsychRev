@@ -74,6 +74,28 @@
   .regen-banner-icon { font-size:20px; flex-shrink:0; }
   .regen-btn { margin-left:auto; flex-shrink:0; padding:6px 12px; background:#185FA5; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
 
+  /* ── CARD EDITOR ── */
+  .fc-edit-btn { position:absolute; top:8px; right:8px; background:rgba(128,128,128,.15); border:none; border-radius:8px; padding:5px 8px; font-size:12px; cursor:pointer; color:var(--text2); z-index:10; }
+  .fc-edit-btn:active { background:rgba(128,128,128,.3); }
+  .card-wrap { position:relative; }
+  .editor-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:300; overflow-y:auto; padding:16px; box-sizing:border-box; }
+  .editor-modal.open { display:block; }
+  .editor-sheet { background:var(--bg); border-radius:16px; padding:20px; max-width:480px; margin:0 auto; }
+  .editor-title { font-size:16px; font-weight:700; margin-bottom:4px; }
+  .editor-sub { font-size:12px; color:var(--text2); margin-bottom:16px; }
+  .editor-field { margin-bottom:14px; }
+  .editor-field label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text2); margin-bottom:5px; }
+  .editor-field textarea { width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:13px; font-family:inherit; resize:vertical; box-sizing:border-box; min-height:72px; }
+  .editor-field select { width:100%; padding:9px 10px; border-radius:10px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:14px; box-sizing:border-box; }
+  .editor-actions { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .editor-btn { flex:1; min-width:80px; padding:11px; border-radius:11px; border:none; font-size:14px; font-weight:600; cursor:pointer; }
+  .editor-btn.primary { background:#185FA5; color:#fff; }
+  .editor-btn.secondary { background:var(--bg2); color:var(--text); }
+  .editor-btn.danger { background:#E24B4A; color:#fff; }
+  .add-card-btn { width:100%; padding:11px; border-radius:12px; border:2px dashed var(--border); background:transparent; color:var(--text2); font-size:14px; font-weight:600; cursor:pointer; margin-top:10px; }
+  .add-card-btn:active { background:var(--bg2); }
+  .custom-badge { font-size:10px; background:#7B5EA7; color:#fff; border-radius:6px; padding:2px 6px; margin-left:6px; vertical-align:middle; }
+
   /* ── PLAN ── */
   .exam-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
   .exam-card { border-radius: 12px; padding: 12px; text-align: center; }
@@ -374,6 +396,7 @@
   <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
   <div class="card-wrap">
     <div class="flashcard" id="flashcard" onclick="revealCard()">
+      <button class="fc-edit-btn" onclick="openCardEditor(event)" title="Edit card">✏️ Edit</button>
       <div class="fc-meta">
         <span class="fc-tag" id="fc-tag"></span>
         <span class="paper-badge" id="fc-paper"></span>
@@ -390,6 +413,7 @@
     </div>
   </div>
   <div class="reveal-hint" id="reveal-hint">Tap the card to see the answer</div>
+  <button class="add-card-btn" onclick="openNewCardEditor()">＋ Add your own card</button>
   <div class="action-row" id="action-row" style="display:none;">
     <button class="act-btn hard" onclick="nextCard(false)">✗ Tricky</button>
     <button class="act-btn good" onclick="nextCard(true)">✓ Got it</button>
@@ -788,7 +812,7 @@ function updateSyncCodeUI(){
 
 async function saveState(){
   const username = (document.getElementById('username-input')||{}).value||localStorage.getItem(USERNAME_KEY)||'';
-  const state={topicStatus,cardScores,lastSaved:new Date().toISOString(),username};
+  const state={topicStatus,cardScores,lastSaved:new Date().toISOString(),username,customCards,cardEdits};
   try{ localStorage.setItem(STORE_KEY,JSON.stringify(state)); }catch(e){}
   updateLastSavedUI(state.lastSaved);
   setSyncStatus('syncing');
@@ -798,7 +822,7 @@ async function saveState(){
     showSaveToast();
   }catch(e){
     setSyncStatus('offline');
-    showSaveToast(); // still show toast — saved locally
+    showSaveToast();
   }
 }
 
@@ -806,11 +830,14 @@ function applyState(state){
   if(state.topicStatus) topicStatus=state.topicStatus;
   if(state.cardScores)  cardScores =state.cardScores;
   if(state.lastSaved)   updateLastSavedUI(state.lastSaved);
+  if(state.customCards) { customCards=state.customCards; }
+  if(state.cardEdits)   { cardEdits=state.cardEdits; }
   if(state.username){
     try{ localStorage.setItem(USERNAME_KEY, state.username); }catch(e){}
     const el=document.getElementById('username-input');
     if(el) el.value=state.username;
   }
+  rebuildAllCards();
 }
 
 function loadFromLocalStorage(){
@@ -867,7 +894,7 @@ function changeSyncId(){
 
 function resetState(){
   if(!confirm('Reset all progress on ALL devices? This cannot be undone.')) return;
-  topicStatus={};cardScores={};
+  topicStatus={};cardScores={};customCards=[];cardEdits={};
   scoreGood=0;scoreHard=0;
   document.getElementById('score-good').textContent=0;
   document.getElementById('score-hard').textContent=0;
@@ -922,6 +949,180 @@ function showSaveToast(){
 
 let topicStatus={};
 let cardScores={};
+// ── CUSTOM CARDS & EDITS ──
+// customCards: array of user-created card objects (same shape as CARDS)
+// cardEdits: object keyed by cardId (topic::q30) → edited field overrides
+let customCards = [];
+let cardEdits = {};
+
+// Merge base CARDS with edits and custom cards into one working array
+function buildMergedCards(){
+  const merged = CARDS.map(c => {
+    const id = cardId(c);
+    const edits = cardEdits[id];
+    return edits ? { ...c, ...edits, _id: id, _custom: false } : { ...c, _id: id, _custom: false };
+  });
+  const custom = customCards.map(c => ({ ...c, _custom: true }));
+  return [...merged, ...custom];
+}
+
+function cardId(c){
+  return (c._id) || (c.topic + '::' + c.q.substring(0, 40));
+}
+
+function rebuildAllCards(){
+  const allCards = buildMergedCards();
+  // Update filter dropdown to include any new custom topics
+  updateFilterDropdown(allCards);
+  // Refresh current filtered set
+  const f = document.getElementById('fc-filter');
+  if(f) loadCards();
+}
+
+function updateFilterDropdown(allCards){
+  const sel = document.getElementById('fc-filter');
+  if(!sel) return;
+  // Get all unique topics including custom
+  const topics = [...new Set(allCards.map(c => c.topic))];
+  const papers = { p1:[], p2:[], p3:[] };
+  topics.forEach(t => {
+    const card = allCards.find(c => c.topic === t);
+    if(card) (papers[card.paper] || papers.p1).push(t);
+  });
+  const total = allCards.length;
+  sel.innerHTML = `<option value="all">All topics (${total} cards)</option>`;
+  const paperLabels = { p1:'── Paper 1', p2:'── Paper 2', p3:'── Paper 3' };
+  ['p1','p2','p3'].forEach(p => {
+    sel.innerHTML += `<option value="${p}" disabled>${paperLabels[p]}</option>`;
+    (papers[p]||[]).forEach(t => {
+      const isCustom = customCards.some(c => c.topic === t);
+      sel.innerHTML += `<option value="${t}">${t}${isCustom?' ✦':''}</option>`;
+    });
+  });
+}
+
+// ── CARD EDITOR STATE ──
+let _editorCardId = null; // null = new card
+
+function openCardEditor(e){
+  e.stopPropagation(); // don't trigger revealCard
+  const allCards = buildMergedCards();
+  const card = allCards[idx];
+  if(!card) return;
+  _editorCardId = cardId(card);
+
+  document.getElementById('editor-title').textContent = 'Edit Card';
+  document.getElementById('editor-sub').textContent = 'Changes sync to all your devices automatically.';
+  document.getElementById('editor-delete-btn').style.display = card._custom ? '' : 'none';
+
+  // Populate fields
+  setEditorTopic(card.topic);
+  document.getElementById('editor-paper').value = card.paper || 'p1';
+  document.getElementById('editor-q').value = card.q || '';
+  document.getElementById('editor-a').value = card.a || '';
+  document.getElementById('editor-pos').value = card.pos || '';
+  document.getElementById('editor-neg').value = card.neg || '';
+
+  document.getElementById('card-editor-modal').classList.add('open');
+}
+
+function openNewCardEditor(){
+  _editorCardId = null;
+  document.getElementById('editor-title').textContent = 'New Card';
+  document.getElementById('editor-sub').textContent = 'Add your own card — it will appear in the topic filter and sync across devices.';
+  document.getElementById('editor-delete-btn').style.display = 'none';
+  // Clear fields
+  setEditorTopic('Social influence');
+  document.getElementById('editor-paper').value = 'p1';
+  document.getElementById('editor-q').value = '';
+  document.getElementById('editor-a').value = '';
+  document.getElementById('editor-pos').value = '';
+  document.getElementById('editor-neg').value = '';
+  document.getElementById('card-editor-modal').classList.add('open');
+}
+
+function setEditorTopic(topic){
+  const sel = document.getElementById('editor-topic');
+  const knownTopics = [...sel.options].map(o => o.value);
+  if(knownTopics.includes(topic)){
+    sel.value = topic;
+    document.getElementById('editor-custom-topic-field').style.display = 'none';
+  } else {
+    sel.value = 'Custom';
+    document.getElementById('editor-custom-topic-field').style.display = '';
+    document.getElementById('editor-custom-topic').value = topic;
+  }
+}
+
+// Watch topic select for "Custom" choice
+document.addEventListener('DOMContentLoaded', () => {
+  const topicSel = document.getElementById('editor-topic');
+  if(topicSel) topicSel.addEventListener('change', () => {
+    document.getElementById('editor-custom-topic-field').style.display =
+      topicSel.value === 'Custom' ? '' : 'none';
+  });
+});
+
+function getEditorTopic(){
+  const sel = document.getElementById('editor-topic');
+  if(sel.value === 'Custom'){
+    return (document.getElementById('editor-custom-topic').value || '').trim() || 'Custom';
+  }
+  return sel.value;
+}
+
+function closeCardEditor(){
+  document.getElementById('card-editor-modal').classList.remove('open');
+  _editorCardId = null;
+}
+
+function saveCardEditor(){
+  const topic = getEditorTopic();
+  const paper = document.getElementById('editor-paper').value;
+  const q     = document.getElementById('editor-q').value.trim();
+  const a     = document.getElementById('editor-a').value.trim();
+  const pos   = document.getElementById('editor-pos').value.trim();
+  const neg   = document.getElementById('editor-neg').value.trim();
+
+  if(!q){ alert('Please enter a question.'); return; }
+
+  if(_editorCardId === null){
+    // New custom card
+    const newCard = { topic, paper, q, a, pos, neg, _custom: true };
+    newCard._id = topic + '::' + q.substring(0, 40) + '_' + Date.now();
+    customCards.push(newCard);
+  } else {
+    // Check if it's a custom card (full replace) or base card (store edits)
+    const customIdx = customCards.findIndex(c => cardId(c) === _editorCardId);
+    if(customIdx >= 0){
+      customCards[customIdx] = { ...customCards[customIdx], topic, paper, q, a, pos, neg };
+    } else {
+      // Store as an edit overlay on the base card
+      cardEdits[_editorCardId] = { topic, paper, q, a, pos, neg };
+    }
+  }
+
+  closeCardEditor();
+  rebuildAllCards();
+  saveState();
+}
+
+function deleteCard(){
+  if(!_editorCardId) return;
+  if(!confirm('Delete this card? This cannot be undone.')) return;
+  // Only custom cards can be fully deleted; base card edits can be reset
+  const customIdx = customCards.findIndex(c => cardId(c) === _editorCardId);
+  if(customIdx >= 0){
+    customCards.splice(customIdx, 1);
+  } else {
+    // Reset edits on base card
+    delete cardEdits[_editorCardId];
+  }
+  closeCardEditor();
+  rebuildAllCards();
+  saveState();
+}
+
 let filtered=[...CARDS];
 let idx=0,revealed=false,scoreGood=0,scoreHard=0,mode='all';
 
@@ -933,6 +1134,7 @@ async function init(){
   loadUsernameUI();
   await loadState();
   buildTopicList();
+  rebuildAllCards();
   loadCards();
 }
 
@@ -1085,10 +1287,11 @@ function setMode(m){
 }
 
 function loadCards(){
-  const f=document.getElementById('fc-filter').value;
-  if(f==='all') filtered=[...CARDS];
-  else if(['p1','p2','p3'].includes(f)) filtered=CARDS.filter(c=>c.paper===f);
-  else filtered=CARDS.filter(c=>c.topic===f);
+  const f = document.getElementById('fc-filter').value;
+  const allCards = buildMergedCards();
+  if(f==='all') filtered=[...allCards];
+  else if(['p1','p2','p3'].includes(f)) filtered=allCards.filter(c=>c.paper===f);
+  else filtered=allCards.filter(c=>c.topic===f);
   idx=0;scoreGood=0;scoreHard=0;
   document.getElementById('score-good').textContent=0;
   document.getElementById('score-hard').textContent=0;
@@ -1096,16 +1299,44 @@ function loadCards(){
 }
 
 function showCard(){
-  if(!filtered.length)return;
+  if(!filtered.length){
+    document.getElementById('fc-q').textContent='No cards in this filter.';
+    document.getElementById('fc-tag').textContent='';
+    document.getElementById('fc-counter').textContent='0 / 0';
+    return;
+  }
   const card=filtered[idx];
   document.getElementById('fc-tag').textContent=card.topic;
   const pe=document.getElementById('fc-paper');
   pe.textContent=card.paper==='p1'?'Paper 1':card.paper==='p2'?'Paper 2':'Paper 3';
   pe.className='paper-badge '+card.paper;
+  // Custom badge
+  let customBadge=document.getElementById('fc-custom-badge');
+  if(!customBadge){
+    customBadge=document.createElement('span');
+    customBadge.id='fc-custom-badge';
+    customBadge.className='custom-badge';
+    customBadge.textContent='Custom';
+    pe.parentNode.insertBefore(customBadge, pe.nextSibling);
+  }
+  customBadge.style.display = card._custom ? '' : 'none';
+  // Check if base card has been edited
+  const isEdited = !card._custom && cardEdits[card._id];
+  let editedBadge=document.getElementById('fc-edited-badge');
+  if(!editedBadge){
+    editedBadge=document.createElement('span');
+    editedBadge.id='fc-edited-badge';
+    editedBadge.className='custom-badge';
+    editedBadge.style.background='#185FA5';
+    editedBadge.textContent='Edited';
+    customBadge.parentNode.insertBefore(editedBadge, customBadge.nextSibling);
+  }
+  editedBadge.style.display = isEdited ? '' : 'none';
+
   document.getElementById('fc-q').textContent=card.q;
-  document.getElementById('fc-a').textContent=card.a;
-  document.getElementById('eval-pos').textContent=card.pos;
-  document.getElementById('eval-neg').textContent=card.neg;
+  document.getElementById('fc-a').textContent=card.a||'';
+  document.getElementById('eval-pos').textContent=card.pos||'';
+  document.getElementById('eval-neg').textContent=card.neg||'';
   document.getElementById('fc-counter').textContent=`${idx+1} / ${filtered.length}`;
   document.getElementById('prog-fill').style.width=`${(idx/filtered.length)*100}%`;
   const ae=document.getElementById('fc-a');
@@ -1151,6 +1382,66 @@ function showPage(name,btn){
 
 init();
 </script>
+<!-- ═══════════ CARD EDITOR MODAL ═══════════ -->
+<div class="editor-modal" id="card-editor-modal">
+  <div class="editor-sheet">
+    <div class="editor-title" id="editor-title">Edit Card</div>
+    <div class="editor-sub" id="editor-sub">Changes sync to all your devices automatically.</div>
+
+    <div class="editor-field">
+      <label>Topic</label>
+      <select id="editor-topic">
+        <option value="Social influence">Social influence</option>
+        <option value="Memory">Memory</option>
+        <option value="Attachment">Attachment</option>
+        <option value="Psychopathology">Psychopathology</option>
+        <option value="Approaches">Approaches</option>
+        <option value="Biopsychology">Biopsychology</option>
+        <option value="Research methods">Research methods</option>
+        <option value="Relationships">Relationships</option>
+        <option value="Schizophrenia">Schizophrenia</option>
+        <option value="Forensic psychology">Forensic psychology</option>
+        <option value="Issues and debates">Issues and debates</option>
+        <option value="Custom">Custom topic…</option>
+      </select>
+    </div>
+    <div class="editor-field" id="editor-custom-topic-field" style="display:none">
+      <label>Custom Topic Name</label>
+      <textarea id="editor-custom-topic" rows="1" style="min-height:40px" placeholder="e.g. Stress, Cognition…"></textarea>
+    </div>
+    <div class="editor-field">
+      <label>Paper</label>
+      <select id="editor-paper">
+        <option value="p1">Paper 1</option>
+        <option value="p2">Paper 2</option>
+        <option value="p3">Paper 3</option>
+      </select>
+    </div>
+    <div class="editor-field">
+      <label>Question (AO1 prompt)</label>
+      <textarea id="editor-q" placeholder="e.g. What is the multi-store model?"></textarea>
+    </div>
+    <div class="editor-field">
+      <label>AO1 — Answer / Knowledge</label>
+      <textarea id="editor-a" placeholder="Key content, definitions, studies…"></textarea>
+    </div>
+    <div class="editor-field">
+      <label>AO3 — Strength</label>
+      <textarea id="editor-pos" placeholder="Supporting evidence, evaluation point…"></textarea>
+    </div>
+    <div class="editor-field">
+      <label>AO3 — Limitation</label>
+      <textarea id="editor-neg" placeholder="Counter-evidence, methodological issue…"></textarea>
+    </div>
+
+    <div class="editor-actions">
+      <button class="editor-btn secondary" onclick="closeCardEditor()">Cancel</button>
+      <button class="editor-btn danger" id="editor-delete-btn" onclick="deleteCard()" style="display:none">Delete</button>
+      <button class="editor-btn primary" onclick="saveCardEditor()">Save & Sync</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ EXAM DATE MODAL ═══════════ -->
 <div class="modal-overlay" id="date-modal" onclick="closeDateModal(event)">
   <div class="modal-sheet">
