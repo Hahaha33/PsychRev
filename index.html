@@ -1353,6 +1353,18 @@ function removeIndentAtCursor(ta){
 
 let _indentToolbarTarget = null;
 
+function _positionIndentToolbar(){
+  const toolbar = document.getElementById('indent-toolbar');
+  if(!toolbar || toolbar.style.display === 'none') return;
+  if(window.visualViewport){
+    // Pin toolbar to top of the visual viewport (accounts for keyboard push)
+    const vv = window.visualViewport;
+    toolbar.style.top = vv.offsetTop + 'px';
+  } else {
+    toolbar.style.top = '0px';
+  }
+}
+
 function showIndentToolbar(ta){
   _indentToolbarTarget = ta;
   let toolbar = document.getElementById('indent-toolbar');
@@ -1371,13 +1383,29 @@ function showIndentToolbar(ta){
   }
   toolbar.style.display = 'flex';
   ta.classList.add('focused');
+
+  // Attach visualViewport listeners to track keyboard appearance
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', _positionIndentToolbar);
+    window.visualViewport.addEventListener('scroll', _positionIndentToolbar);
+  }
+  _positionIndentToolbar();
 }
 
 function hideIndentToolbar(){
   const toolbar = document.getElementById('indent-toolbar');
-  if(toolbar) toolbar.style.display = 'none';
+  if(toolbar){
+    toolbar.style.display = 'none';
+    toolbar.style.top = '0px';
+  }
   if(_indentToolbarTarget) _indentToolbarTarget.classList.remove('focused');
   _indentToolbarTarget = null;
+
+  // Clean up visualViewport listeners
+  if(window.visualViewport){
+    window.visualViewport.removeEventListener('resize', _positionIndentToolbar);
+    window.visualViewport.removeEventListener('scroll', _positionIndentToolbar);
+  }
 }
 
 // Convert plain text with newlines, "- " bullets, and indentation into safe HTML
