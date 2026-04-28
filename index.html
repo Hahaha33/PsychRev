@@ -75,9 +75,9 @@
   .regen-btn { margin-left:auto; flex-shrink:0; padding:6px 12px; background:#185FA5; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
 
   /* ── CARD EDITOR ── */
-  .fc-edit-btn { position:absolute; top:8px; right:8px; background:rgba(128,128,128,.15); border:none; border-radius:8px; padding:5px 8px; font-size:12px; cursor:pointer; color:var(--text2); z-index:10; }
-  .fc-edit-btn:active { background:rgba(128,128,128,.3); }
-  .card-wrap { position:relative; }
+  .card-toolbar { display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:-6px; margin-bottom:8px; }
+  .card-toolbar-btn { background:none; border:none; font-size:12px; color:var(--text2); cursor:pointer; padding:4px 8px; border-radius:8px; }
+  .card-toolbar-btn:active { background:var(--bg2); }
   .editor-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:300; overflow-y:auto; padding:16px; box-sizing:border-box; }
   .editor-modal.open { display:block; }
   .editor-sheet { background:var(--bg); border-radius:16px; padding:20px; max-width:480px; margin:0 auto; }
@@ -396,7 +396,6 @@
   <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
   <div class="card-wrap">
     <div class="flashcard" id="flashcard" onclick="revealCard()">
-      <button class="fc-edit-btn" onclick="openCardEditor(event)" title="Edit card">✏️ Edit</button>
       <div class="fc-meta">
         <span class="fc-tag" id="fc-tag"></span>
         <span class="paper-badge" id="fc-paper"></span>
@@ -411,6 +410,9 @@
         </div>
       </div>
     </div>
+  </div>
+  <div class="card-toolbar">
+    <button class="card-toolbar-btn" onclick="openCardEditor(event)">✏️ Edit card</button>
   </div>
   <div class="reveal-hint" id="reveal-hint">Tap the card to see the answer</div>
   <button class="add-card-btn" onclick="openNewCardEditor()">＋ Add your own card</button>
