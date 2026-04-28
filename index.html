@@ -396,6 +396,7 @@
     <div class="deck-done-title" id="deck-done-title">✓ Deck complete!</div>
     <div class="deck-done-sub" id="deck-done-sub"></div>
     <button class="deck-done-btn" id="deck-done-btn" onclick="startTrickyRound()" style="display:none">🔁 Review tricky cards</button>
+    <button class="deck-done-btn" id="deck-restart-btn" onclick="loadCards()" style="margin-top:0;background:var(--bg2);color:var(--text2);border-color:var(--border);">↺ Restart deck</button>
   </div>
   <div class="fc-status">
     <span class="fc-counter" id="fc-counter">1 / 67</span>
@@ -1502,30 +1503,25 @@ function toggleShuffle(){
   isShuffled = !isShuffled;
   const btn = document.getElementById('shuffle-btn');
   btn.classList.toggle('active', isShuffled);
+  // Remember which card we're on before re-ordering
+  const currentId = filtered[idx]?._id;
   if(isShuffled){
-    // Fisher-Yates shuffle of a copy, preserving the current card at position 0
-    const current = filtered[idx];
-    const rest = filtered.filter((_,i) => i !== idx);
-    for(let i=rest.length-1;i>0;i--){
+    // Fisher-Yates shuffle of the whole array in-place
+    for(let i=filtered.length-1;i>0;i--){
       const j=Math.floor(Math.random()*(i+1));
-      [rest[i],rest[j]]=[rest[j],rest[i]];
+      [filtered[i],filtered[j]]=[filtered[j],filtered[i]];
     }
-    filtered = [current, ...rest];
-    idx = 0;
   } else {
-    // Restore original order from rebuilt cards
+    // Restore canonical order from the source cards
     const f = document.getElementById('fc-filter').value;
     const allCards = buildMergedCards();
-    let restored;
-    if(f==='all') restored=[...allCards];
-    else if(['p1','p2','p3'].includes(f)) restored=allCards.filter(c=>c.paper===f);
-    else restored=allCards.filter(c=>c.topic===f);
-    // Preserve current card position
-    const currentId = filtered[idx]?._id;
-    filtered = restored;
-    idx = filtered.findIndex(c=>c._id===currentId);
-    if(idx<0) idx=0;
+    if(f==='all') filtered=[...allCards];
+    else if(['p1','p2','p3'].includes(f)) filtered=allCards.filter(c=>c.paper===f);
+    else filtered=allCards.filter(c=>c.topic===f);
   }
+  // In both cases: find the current card in the new order so the counter stays put
+  const found = filtered.findIndex(c=>c._id===currentId);
+  idx = found >= 0 ? found : 0;
   showCard();
 }
 
