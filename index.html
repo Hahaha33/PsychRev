@@ -181,10 +181,11 @@
   .card-bullets { margin: 4px 0 4px 16px; padding: 0; }
   .card-bullets li { margin-bottom: 3px; }
   .card-indent { display:block; padding-left: 1.4em; }
-  .indent-toolbar { display:none; position:absolute; z-index:400; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:5px 8px; gap:6px; align-items:center; box-shadow:0 2px 12px rgba(0,0,0,.18); flex-wrap:wrap; }
+  .indent-toolbar { display:none; position:fixed; top:0; left:0; right:0; z-index:400; background:var(--bg2); border-bottom:1px solid var(--border); padding:8px 12px; gap:6px; align-items:center; box-shadow:0 2px 12px rgba(0,0,0,.18); flex-wrap:wrap; }
   .indent-toolbar-label { font-size:11px; color:var(--text2); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
   .indent-btn { background:var(--bg); border:1px solid var(--border); border-radius:7px; padding:5px 10px; font-size:12px; font-weight:600; cursor:pointer; color:var(--text); white-space:nowrap; }
   .indent-btn:active { background:var(--text); color:var(--bg); }
+  .editor-field textarea.focused { min-height:140px; transition:min-height .2s ease; }
   .eval-box.pos .eval-txt { color: #2E5A0E; }
   .eval-box.neg .eval-txt { color: #7A1F1F; }
   .reveal-hint { text-align: center; font-size: 13px; color: var(--text2); padding: 8px; }
@@ -1369,17 +1370,13 @@ function showIndentToolbar(ta){
     document.body.appendChild(toolbar);
   }
   toolbar.style.display = 'flex';
-  requestAnimationFrame(() => {
-    const r = ta.getBoundingClientRect();
-    toolbar.style.top  = (r.top + window.scrollY - toolbar.offsetHeight - 6) + 'px';
-    toolbar.style.left = r.left + 'px';
-    toolbar.style.width = r.width + 'px';
-  });
+  ta.classList.add('focused');
 }
 
 function hideIndentToolbar(){
   const toolbar = document.getElementById('indent-toolbar');
   if(toolbar) toolbar.style.display = 'none';
+  if(_indentToolbarTarget) _indentToolbarTarget.classList.remove('focused');
   _indentToolbarTarget = null;
 }
 
