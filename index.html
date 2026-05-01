@@ -1035,8 +1035,7 @@ let _editorCardId = null; // null = new card
 
 function openCardEditor(e){
   e.stopPropagation(); // don't trigger revealCard
-  const allCards = buildMergedCards();
-  const card = allCards[idx];
+  const card = filtered[idx];
   if(!card) return;
   _editorCardId = cardId(card);
 
